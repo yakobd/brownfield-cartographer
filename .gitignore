@@ -1,0 +1,24 @@
+# Python virtual environment
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+*.pyc
+
+# Project artifacts
+.cartography/
+
+# Ignore JSON files everywhere except in src/
+*.json
+!src/*.json
+!src/**/*.json
+
+# Temporary files and directories
+*.tmp
+*.temp
+tmp/
+temp/
+*~
+*.swp
