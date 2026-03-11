@@ -1,17 +1,16 @@
 from __future__ import annotations
 
-import json
 import os
 import math
 import re
-
-import networkx as nx
+import shutil
+import subprocess
 
 from src.agents.surveyor import Surveyor
 from src.analyzers.git_analyzer import get_git_velocity
 from src.agents.hydrologist import HydrologistAgent
-from src.graph.knowledge_graph import analyze_codebase_graph
-from src.models.models import FileNode
+from src.graph.knowledge_graph import KnowledgeGraphService, analyze_codebase_graph
+from src.models.models import DatasetNode, Edge, FileNode, ModuleNode
 
 
 class Orchestrator:
@@ -22,21 +21,46 @@ class Orchestrator:
         self.surveyor = Surveyor()
         self.hydrologist = HydrologistAgent()
         self.excluded_dirs = {".git", ".venv", "venv", "node_modules", "__pycache__", ".cartography"}
+        self._prepared_repo_path: str | None = None
+        self._temp_repo_path = os.path.abspath(os.path.join(".cartography", "temp_repo"))
 
     def run(self) -> None:
         self.run_surveyor_phase()
 
+    def run_all(self) -> None:
+        """Run survey and lineage phases with failure isolation."""
+        try:
+            self._prepare_repo()
+        except Exception as exc:
+            print(f"ERROR: Failed to prepare repository: {exc}")
+            return
+
+        try:
+            self.run_surveyor_phase()
+        except Exception as exc:
+            print(f"ERROR: Surveyor phase failed: {exc}")
+
+        try:
+            self.run_lineage_phase()
+        except Exception as exc:
+            print(f"ERROR: Lineage phase failed: {exc}")
+        finally:
+            self._cleanup_prepared_repo()
+
     def run_surveyor_phase(self) -> None:
         """Run Surveyor parsing and save Phase 1 graph artifacts."""
-        print(f"--- Mapping Codebase: {self.repo_path} ---")
-        if not os.path.exists(self.repo_path):
-            print(f"ERROR: Directory NOT FOUND at {self.repo_path}")
+        active_repo_path, local_cleanup = self._enter_repo_context()
+        print(f"--- Mapping Codebase: {active_repo_path} ---")
+        if not os.path.exists(active_repo_path):
+            print(f"ERROR: Directory NOT FOUND at {active_repo_path}")
+            if local_cleanup:
+                self._cleanup_prepared_repo()
             return
 
         knowledge_graph: list[FileNode] = []
         file_count = 0
 
-        for root, dirs, files in os.walk(self.repo_path):
+        for root, dirs, files in os.walk(active_repo_path):
             dirs[:] = [d for d in dirs if d not in self.excluded_dirs]
 
             for file_name in files:
@@ -75,7 +99,37 @@ class Orchestrator:
         if file_count == 0:
             print("WARNING: No relevant files found. Check your repo_path!")
 
+        module_nodes = self.surveyor.to_module_nodes(knowledge_graph)
+        self.surveyor.build_graph(module_nodes)
+        surveyor_hubs = self.surveyor.calculate_pagerank()
+        dead_modules = self.surveyor.detect_dead_code()
+        circular_dependencies = self.surveyor.detect_cycles()
+
         survey_data = [node.model_dump() for node in knowledge_graph]
+        module_graph_service = KnowledgeGraphService()
+
+        for node in knowledge_graph:
+            module_graph_service.add_typed_node(
+                ModuleNode(
+                    id=node.file_path,
+                    file_path=node.file_path,
+                    language=node.language,
+                    file_size=node.file_size,
+                    imports=node.imports,
+                    change_frequency=node.change_frequency,
+                )
+            )
+
+        module_lookup = self._build_module_lookup(knowledge_graph)
+        for node in knowledge_graph:
+            for import_name in node.imports:
+                target_id = self._resolve_module_target(import_name, module_lookup)
+                if target_id and target_id in module_graph_service.graph:
+                    module_graph_service.add_typed_edge(
+                        node.file_path,
+                        target_id,
+                        Edge(source=node.file_path, target=target_id, relation="DEPENDS_ON"),
+                    )
 
         print("\n--- Running Phase 1 Analytics (NetworkX) ---")
         os.makedirs(".cartography", exist_ok=True)
@@ -91,22 +145,66 @@ class Orchestrator:
             analysis["high_velocity_core"] = []
 
         with open(module_graph_path, "w", encoding="utf-8") as file:
-            json.dump(analysis, file, indent=4)
+            file.write(module_graph_service.to_json())
 
-        print(f"--- Done! Saved graph analysis to {module_graph_path} ---")
+        print(f"--- Done! Saved typed module graph to {module_graph_path} ---")
+        print(f"--- Analytics computed for {len(analysis.get('hubs', []))} hubs ---")
         print(f"Top Architectural Hub: {analysis['hubs'][0] if analysis['hubs'] else 'N/A'}")
         print(f"Circular Loops Found: {len(analysis['circular_dependencies'])}")
         print(f"High-Velocity Core Files: {len(analysis['high_velocity_core'])}")
+
+        print("--- Surveyor Graph Insights ---")
+        if surveyor_hubs:
+            formatted_hubs = [f"{node} ({score:.4f})" for node, score in surveyor_hubs]
+            print(f"PageRank Hubs: {formatted_hubs}")
+        else:
+            print("PageRank Hubs: []")
+        print(f"Dead-Code Candidates (In-degree=0): {dead_modules}")
+        print(f"Circular Dependencies Detected: {circular_dependencies}")
         print("--- Phase 1 Complete ---")
+
+        if local_cleanup:
+            self._cleanup_prepared_repo()
 
     def run_lineage_phase(self) -> None:
         """Run lineage analysis and save the graph under .cartography."""
-        graph = self.hydrologist.analyze_repo(self.repo_path)
+        active_repo_path, local_cleanup = self._enter_repo_context()
+        graph = self.hydrologist.analyze_repo(active_repo_path)
+        svc = KnowledgeGraphService()
+
+        for node_id, attrs in graph.nodes(data=True):
+            reference = attrs.get("reference")
+            metadata = attrs.get("metadata") if isinstance(attrs.get("metadata"), dict) else {}
+
+            dataset_name = str(
+                reference
+                or metadata.get("name")
+                or metadata.get("dag_id")
+                or node_id
+            )
+
+            svc.add_typed_node(
+                DatasetNode(
+                    id=str(node_id),
+                    dataset_name=dataset_name,
+                    database=metadata.get("database"),
+                    schema=metadata.get("schema"),
+                )
+            )
+
+        for source, target, attrs in graph.edges(data=True):
+            relation = self._normalize_relation(attrs.get("relation"))
+            if source in svc.graph and target in svc.graph:
+                svc.add_typed_edge(
+                    str(source),
+                    str(target),
+                    Edge(source=str(source), target=str(target), relation=relation),
+                )
 
         os.makedirs(".cartography", exist_ok=True)
         output_path = ".cartography/lineage_graph.json"
         with open(output_path, "w", encoding="utf-8") as file:
-            json.dump(nx.node_link_data(graph), file, indent=4)
+            file.write(svc.to_json())
 
         impact = self.hydrologist.get_impact_analysis()
         source_count = len(impact.get("sources", []))
@@ -114,3 +212,82 @@ class Orchestrator:
 
         print(f"--- Lineage phase complete. Saved graph to {output_path} ---")
         print(f"Sources detected: {source_count} | Sinks detected: {sink_count}")
+
+        if local_cleanup:
+            self._cleanup_prepared_repo()
+
+    def _prepare_repo(self) -> str:
+        """Prepare repository path, cloning remote URLs into .cartography/temp_repo."""
+        if self._prepared_repo_path:
+            return self._prepared_repo_path
+
+        if self.repo_path.startswith("http"):
+            if shutil.which("git") is None:
+                raise RuntimeError(
+                    "Git executable not found. Please install Git to analyze remote repositories."
+                )
+
+            os.makedirs(".cartography", exist_ok=True)
+            if os.path.exists(self._temp_repo_path):
+                shutil.rmtree(self._temp_repo_path)
+
+            clone_cmd = ["git", "clone", "--depth", "1", self.repo_path, self._temp_repo_path]
+            result = subprocess.run(clone_cmd, capture_output=True, text=True, check=False)
+            if result.returncode != 0:
+                raise RuntimeError(result.stderr.strip() or "git clone failed")
+
+            self._prepared_repo_path = self._temp_repo_path
+            print(f"Prepared temporary clone at {self._prepared_repo_path}")
+        else:
+            self._prepared_repo_path = self.repo_path
+
+        return self._prepared_repo_path
+
+    def _cleanup_prepared_repo(self) -> None:
+        """Cleanup temporary cloned repo when using URL-based repo paths."""
+        if self.repo_path.startswith("http") and self._prepared_repo_path and os.path.exists(self._prepared_repo_path):
+            shutil.rmtree(self._prepared_repo_path)
+            print(f"Cleaned up temporary clone at {self._prepared_repo_path}")
+        self._prepared_repo_path = None
+
+    def _enter_repo_context(self) -> tuple[str, bool]:
+        """Return active repo path and whether this call should cleanup after running."""
+        if self._prepared_repo_path is not None:
+            return self._prepared_repo_path, False
+        return self._prepare_repo(), True
+
+    def _build_module_lookup(self, nodes: list[FileNode]) -> dict[str, str]:
+        lookup: dict[str, str] = {}
+        for node in nodes:
+            base_name = os.path.basename(node.file_path)
+            stem, _ext = os.path.splitext(base_name)
+            lookup.setdefault(base_name, node.file_path)
+            lookup.setdefault(stem, node.file_path)
+        return lookup
+
+    def _resolve_module_target(self, import_name: str, lookup: dict[str, str]) -> str | None:
+        normalized = import_name.strip().lstrip(".")
+        if not normalized:
+            return None
+        if normalized in lookup:
+            return lookup[normalized]
+        parts = normalized.split(".")
+        for part in reversed(parts):
+            if part in lookup:
+                return lookup[part]
+        return None
+
+    def _normalize_relation(self, relation: str | None) -> str:
+        mapping = {
+            "reads_from": "READS_FROM",
+            "writes_to": "WRITES_TO",
+            "defines": "DEFINES",
+            "declared_in": "DECLARED_IN",
+            "feeds": "FEEDS",
+            "depends_on": "DEPENDS_ON",
+            "calls": "CALLS",
+            "contains": "CONTAINS",
+        }
+        if not relation:
+            return "DEPENDS_ON"
+        return mapping.get(str(relation).lower(), "DEPENDS_ON")

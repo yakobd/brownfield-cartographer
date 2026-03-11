@@ -7,13 +7,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Brownfield Cartographer CLI")
     parser.add_argument(
         "command",
-        choices=["survey", "lineage"],
-        help="Command to run. Use 'survey' for Phase 1 or 'lineage' for lineage graph.",
+        choices=["survey", "lineage", "full"],
+        help="Command to run: 'survey' (Phase 1), 'lineage' (Phase 2), or 'full' (run both).",
     )
     parser.add_argument(
         "--repo-path",
         default=".",
-        help="Path to the target repository (default: current directory).",
+        help="Target repository as a local path or GitHub URL (default: current directory).",
     )
     parser.add_argument(
         "--node",
@@ -25,7 +25,7 @@ def main() -> None:
     orchestrator = Orchestrator(repo_path=args.repo_path)
     if args.command == "survey":
         orchestrator.run_surveyor_phase()
-    else:
+    elif args.command == "lineage":
         if args.node:
             orchestrator.hydrologist.analyze_repo(orchestrator.repo_path)
             blast_radius = orchestrator.hydrologist.get_blast_radius(args.node)
@@ -37,6 +37,8 @@ def main() -> None:
                 print(f"No downstream impact found for '{args.node}'.")
         else:
             orchestrator.run_lineage_phase()
+    else:
+        orchestrator.run_all()
 
 if __name__ == "__main__":
     main()

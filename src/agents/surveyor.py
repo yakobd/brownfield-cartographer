@@ -5,12 +5,14 @@ import re
 from pathlib import Path
 from typing import Any, List, Tuple
 
+import networkx as nx
 from tree_sitter import Language, Parser, Query
 import tree_sitter_sql
 import tree_sitter_yaml
 import tree_sitter_python as tspython
 
-from src.models.models import CodeEntity, FileNode
+from src.analyzers.git_analyzer import get_git_velocity as git_velocity_for_file
+from src.models.models import CodeEntity, FileNode, ModuleNode
 
 
 class Surveyor:
@@ -27,6 +29,7 @@ class Surveyor:
 
         self.parser = Parser()
         self.excluded_dirs = {".git", ".venv", "venv", "node_modules", "__pycache__", ".cartography"}
+        self.graph = nx.DiGraph()
 
     def scan_repository(self, repo_path: str) -> List[FileNode]:
         """Walk a repository and return parsed FileNodes for supported files."""
@@ -41,6 +44,7 @@ class Surveyor:
                 full_path = os.path.join(root, file_name)
                 try:
                     file_node = self.parse_file(full_path)
+                    file_node.change_frequency = self.get_git_velocity(full_path)
                     knowledge_graph.append(file_node)
                 except Exception:
                     # Keep scanning even if a single file cannot be parsed.
@@ -81,6 +85,68 @@ class Surveyor:
             entities=entities,
             change_frequency=0,
         )
+
+    def get_git_velocity(self, file_path: str) -> int:
+        """Return commit-frequency signal for a file."""
+        return git_velocity_for_file(file_path)
+
+    def to_module_nodes(self, nodes: List[FileNode]) -> List[ModuleNode]:
+        """Convert FileNode objects into typed ModuleNode objects."""
+        module_nodes: List[ModuleNode] = []
+        for node in nodes:
+            module_nodes.append(
+                ModuleNode(
+                    id=node.file_path,
+                    file_path=node.file_path,
+                    language=node.language,
+                    file_size=node.file_size,
+                    imports=node.imports,
+                    change_frequency=node.change_frequency,
+                )
+            )
+        return module_nodes
+
+    def build_graph(self, nodes: List[ModuleNode]) -> nx.DiGraph:
+        """Build a directed dependency graph from module nodes."""
+        self.graph = nx.DiGraph()
+
+        lookup = self._build_module_lookup(nodes)
+        for node in nodes:
+            self.graph.add_node(
+                node.id,
+                type=node.type,
+                file_path=node.file_path,
+                language=node.language,
+                file_size=node.file_size,
+                change_frequency=node.change_frequency,
+            )
+
+        for node in nodes:
+            for import_name in node.imports:
+                target_id = self._resolve_import_target(import_name, lookup)
+                if target_id and target_id in self.graph:
+                    self.graph.add_edge(node.id, target_id, relation="DEPENDS_ON")
+
+        return self.graph
+
+    def calculate_pagerank(self, top_n: int = 5) -> List[Tuple[str, float]]:
+        """Calculate PageRank scores and return top architectural hubs."""
+        if self.graph.number_of_nodes() == 0:
+            return []
+        pagerank = nx.pagerank(self.graph)
+        return sorted(pagerank.items(), key=lambda item: item[1], reverse=True)[:top_n]
+
+    def detect_dead_code(self) -> List[str]:
+        """Return modules with zero in-degree (not imported by others)."""
+        if self.graph.number_of_nodes() == 0:
+            return []
+        return sorted([node for node in self.graph.nodes if self.graph.in_degree(node) == 0])
+
+    def detect_cycles(self) -> List[List[str]]:
+        """Detect circular dependencies in the module graph."""
+        if self.graph.number_of_nodes() == 0:
+            return []
+        return [cycle for cycle in nx.simple_cycles(self.graph)]
 
     # --- PYTHON EXTRACTORS (Restored from your original code) ---
 
@@ -183,3 +249,24 @@ class Surveyor:
             entities=[],
             change_frequency=0,
         )
+
+    def _build_module_lookup(self, nodes: List[ModuleNode]) -> dict[str, str]:
+        lookup: dict[str, str] = {}
+        for node in nodes:
+            base_name = os.path.basename(node.file_path)
+            stem, _ext = os.path.splitext(base_name)
+            lookup.setdefault(base_name, node.id)
+            lookup.setdefault(stem, node.id)
+        return lookup
+
+    def _resolve_import_target(self, import_name: str, lookup: dict[str, str]) -> str | None:
+        normalized = import_name.strip().lstrip(".")
+        if not normalized:
+            return None
+        if normalized in lookup:
+            return lookup[normalized]
+        parts = normalized.split(".")
+        for part in reversed(parts):
+            if part in lookup:
+                return lookup[part]
+        return None
