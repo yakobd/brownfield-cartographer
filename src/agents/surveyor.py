@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import subprocess
+import os
 import re
 from pathlib import Path
 from typing import Any, List, Tuple
@@ -14,7 +14,7 @@ from src.models.models import CodeEntity, FileNode
 
 
 class Surveyor:
-    """Multi-lingual Parser for Python, SQL, and YAML with Git Velocity tracking."""
+    """Multi-lingual parser for Python, SQL, and YAML source mapping."""
 
     def __init__(self) -> None:
         # Initialize grammar objects per file extension.
@@ -26,15 +26,27 @@ class Surveyor:
         }
 
         self.parser = Parser()
+        self.excluded_dirs = {".git", ".venv", "venv", "node_modules", "__pycache__", ".cartography"}
 
-    def extract_git_velocity(self, file_path: str, days: int = 30) -> int:
-        """Computes change frequency (Git log count)."""
-        try:
-            cmd = f'git rev-list --count --since="{days} days ago" HEAD -- "{file_path}"'
-            result = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
-            return int(result.decode("utf-8").strip())
-        except Exception:
-            return 0
+    def scan_repository(self, repo_path: str) -> List[FileNode]:
+        """Walk a repository and return parsed FileNodes for supported files."""
+        knowledge_graph: List[FileNode] = []
+
+        for root, dirs, files in os.walk(repo_path):
+            dirs[:] = [d for d in dirs if d not in self.excluded_dirs]
+            for file_name in files:
+                if not file_name.endswith((".py", ".sql", ".yml", ".yaml")):
+                    continue
+
+                full_path = os.path.join(root, file_name)
+                try:
+                    file_node = self.parse_file(full_path)
+                    knowledge_graph.append(file_node)
+                except Exception:
+                    # Keep scanning even if a single file cannot be parsed.
+                    continue
+
+        return knowledge_graph
 
     def parse_file(self, file_path: str) -> FileNode:
         path = Path(file_path)
@@ -61,15 +73,13 @@ class Surveyor:
         elif ext in [".yml", ".yaml"]:
             imports = self._extract_yaml_deps(source_bytes)
 
-        velocity = self.extract_git_velocity(file_path)
-
         return FileNode(
             file_path=str(path),
             language=ext[1:] if ext else "unknown",
             file_size=len(source_bytes),
             imports=imports,
             entities=entities,
-            change_frequency=velocity
+            change_frequency=0,
         )
 
     # --- PYTHON EXTRACTORS (Restored from your original code) ---
