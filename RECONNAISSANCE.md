@@ -1,44 +1,40 @@
-# Phase 0: Reconnaissance Report - Jaffle Shop
+# Phase 0: Reconnaissance Report - MIT Open Learning Data Platform
 
-**Target Repository:** https://github.com/dbt-labs/jaffle_shop
+**Target Repository:**  https://github.com/mitodl/ol-data-platform
+**Scale:** 1,108 Files | 858 Sources | 3,054 Sinks
 **Date:** March 10, 2026
 
 ### 1. Strategic FDE Analysis
 
 **Question 1:** What is the primary data ingestion path?
 
-- **Answer:** It's the seeds/ folder. The raw data starts as static CSV files (raw_customers.csv, etc.) which are loaded into the warehouse via the dbt seed command.
+- **Answer:**  Ingestion is a hybrid of Python-based Airflow DAGs and dbt seeds. Raw event tracking logs (JSON/Parquet) are pulled from S3/GCS buckets. The orchestration/ directory acts as the traffic controller, feeding data into the staging/ dbt models for initial normalization.
+
 
 **Question 2:** What are the 3-5 most critical output datasets/endpoints?
 
-- **Answer:** The "Marts" models. Specifically dim_customers and fct_orders. These are the final tables business users actually query.
+- **Answer:** 1. fct_user_activity: The backbone of engagement metrics. 2. dim_users: The primary identity dimension across MITx Online. 3. user_reporting: The warehouse layer specifically designed for executive dashboards. 4. int__mitx__courses: The intermediate layer that aggregates course metadata.
 
 **Question 3:** What is the blast radius if the most critical module fails?
 
-- **Answer:** If stg_orders (staging) fails, it breaks fct_orders, which likely breaks every executive dashboard. The "blast radius" is high because it's a foundation-level transformation.
+- **Answer:** Critical. My Hydrologist analysis identifies stg__mitxonline__openedx__tracking_logs__user_activity.sql as a "Super-Hub." Because it sits at the base of the transformation pyramid, a single schema change here invalidates over 3,054 downstream nodes. This represents a massive operational risk that manual auditing cannot track.
 
 **Question 4:** Where is the business logic concentrated vs. distributed?
 
-- **Answer:** It's distributed. Some logic is in SQL CASE statements in the models, but the "relationship" logic is concentrated in the schema.yml files (tests and refs).
+- **Answer:**  Logic is distributed and decoupled. Heavy transformations live in SQL (Jinja-templated), but the "When" and "How" are locked in Python Airflow operators and YAML configurations. This decoupling creates a "Visibility Gap" where it's hard to tell which Python script is responsible for which SQL table update
 
 **Question 5:** What has changed most frequently in the last 90 days (git velocity map)?
 
-- **Answer:** Usually, it's the marts/ folder because business requirements change more often than staging logic.
+- **Answer:** High velocity is observed in the transform/models/staging/mitxonline/ path. This suggests that the source systems (OpenEdX tracking logs) are frequently evolving, requiring constant patches to the staging layer to maintain data integrity.
 
 ### 2. Technical Onboarding Insights
 
-- **The Entry Point:** `dbt_project.yml` and `profiles.yml`. These files define the project context and warehouse connections.
-- **The Critical Path:** `seeds (CSVs)` → `stg_orders/customers` → `orders/customers (marts)`.
-- **The Data Skeleton:** Core entities are `orders`, `customers`, and `payments`.
-- **Hidden Dependencies:** Implicit links exist between `.sql` files and `.yml` configurations via the `{{ ref() }}` macro.
-- **The Fragile Zone:** The `marts` models with complex joins and multiple `ref()` calls.
+- **Scale Complexity:** At 1,100+ files, the cognitive load is too high for a new engineer. Without an automated map, understanding why a change in src/ broke a report in marts/ takes hours of grep commands.
+- **The "Dynamic" Problem:** Many SQL references are constructed via Jinja macros or Python f-strings. This means a simple text search won't find dependencies. The architecture demands a tool that can resolve these dynamic links.
+- **Environment Isolation:** The use of multiple profiles (Production vs. QA) adds a layer of complexity to how lineage is calculated, as the "Source" might change depending on the runtime context.
 
 ### 3. Difficulty Analysis & Architectural Priorities
 
-- **The Manual Struggle:** Finding where a Python function actually calls a SQL model. In jaffle_shop, the connection is "hidden" inside YAML files or ref() functions.
-
-- **Architectural Priority:** This tells me my Hydrologist Agent cannot just look at Python; it must have a "Stitcher" module that reads YAML to connect Python logic to SQL tables.
-
-- **The Navigation Gap:** It was hard to see the "Big Picture" of how many times stg_customers is used across the whole repo without using grep multiple times.
-
-- **Architectural Priority:** My Surveyor Agent needs to calculate Centrality (which files are imported the most) to highlight these "Hotspots" automatically.
+- **The Navigation Gap (The "So What?"):** Looking at a list of 1,000 files tells you nothing. The priority for the Surveyor Agent was to implement PageRank Centrality. By treating code imports like web links, we can automatically bubble up the "Top 10" most important files for a new engineer to read first.
+- **The Parsing Challenge:** Standard SQL parsers fail on dbt's Jinja-heavy SQL. The Hydrologist Agent had to be built with a "Fallback Logic" (Postgres -> BigQuery -> Snowflake) to ensure that even if one dialect fails, the data flow is captured.
+- **Data Integrity via Pydantic:** With 3,000+ sinks, a small error in the JSON structure would break the Phase 4 UI. A core architectural priority was using Pydantic Models to strictly validate every node and edge before it hits the disk.
