@@ -104,7 +104,7 @@ class Orchestrator:
         graph = self.hydrologist.analyze_repo(self.repo_path)
 
         os.makedirs(".cartography", exist_ok=True)
-        output_path = ".cartography/data_lineage.json"
+        output_path = ".cartography/lineage_graph.json"
         with open(output_path, "w", encoding="utf-8") as file:
             json.dump(nx.node_link_data(graph), file, indent=4)
 

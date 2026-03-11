@@ -8,7 +8,7 @@ __pycache__/
 *.pyc
 
 # Project artifacts
-.cartography/
+
 
 # Ignore JSON files everywhere except in src/
 *.json

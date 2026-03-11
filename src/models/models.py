@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict
+from typing import Any, Dict, List, Optional
 from datetime import datetime
 
 class CodeEntity(BaseModel):
@@ -19,3 +19,23 @@ class FileNode(BaseModel):
     entities: List[CodeEntity] = Field(default_factory=list)
     git_last_modified: Optional[datetime] = None
     change_frequency: int = 0  # Git Velocity
+
+
+class Node(BaseModel):
+    """Generic graph node representation for serialized knowledge graphs."""
+    id: str
+    type: str
+    properties: Dict[str, Any] = Field(default_factory=dict)
+
+
+class Edge(BaseModel):
+    """Directed graph edge between two nodes."""
+    source: str
+    target: str
+    relation: str
+
+
+class KnowledgeGraph(BaseModel):
+    """Container for graph nodes and edges."""
+    nodes: List[Node] = Field(default_factory=list)
+    edges: List[Edge] = Field(default_factory=list)
