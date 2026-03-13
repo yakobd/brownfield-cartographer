@@ -7,8 +7,10 @@ import re
 import shutil
 import subprocess
 
+
 from src.agents.surveyor import Surveyor
 from src.agents.archivist import ArchivistAgent
+from src.agents.semanticist import SemanticistAgent
 from src.analyzers.git_analyzer import get_git_velocity
 from src.agents.hydrologist import HydrologistAgent
 from src.graph.knowledge_graph import KnowledgeGraphService, analyze_codebase_graph
@@ -23,15 +25,18 @@ class Orchestrator:
         self.surveyor = Surveyor()
         self.hydrologist = HydrologistAgent()
         self.archivist = ArchivistAgent()
+        self.semanticist = SemanticistAgent()
         self.excluded_dirs = {".git", ".venv", "venv", "node_modules", "__pycache__", ".cartography"}
         self._prepared_repo_path: str | None = None
         self._temp_repo_path = os.path.abspath(os.path.join(".cartography", "temp_repo"))
+        self._semantic_nodes: list[dict] | None = None
 
     def run(self) -> None:
         self.run_surveyor_phase()
 
     def run_all(self) -> None:
         """Run survey and lineage phases with failure isolation."""
+        self._semantic_nodes = None
         try:
             self._prepare_repo()
         except Exception as exc:
@@ -49,7 +54,33 @@ class Orchestrator:
             print(f"ERROR: Lineage phase failed: {exc}")
 
         try:
-            self.run_archivist_phase()
+            module_graph_path = ".cartography/module_graph.json"
+            if os.path.exists(module_graph_path):
+                with open(module_graph_path, "r", encoding="utf-8") as file:
+                    module_data = json.loads(file.read())
+                nodes = module_data.get("nodes", [])
+                self._semantic_nodes = self.semanticist.run_semantic_phase(nodes)
+                print("--- Clustering semantic hubs into domains ---")
+                self._semantic_nodes = self.semanticist.cluster_into_domains(self._semantic_nodes)
+                print("--- Generating semantic artifacts in .cartography ---")
+                report_path = self.semanticist.generate_fde_report(self._semantic_nodes)
+                codebase_path = os.path.join(".cartography", "CODEBASE.md")
+                if os.path.exists(codebase_path):
+                    print(f"--- Codebase summary saved to {codebase_path} ---")
+                else:
+                    print(f"WARNING: Expected semantic artifact missing: {codebase_path}")
+
+                if os.path.exists(report_path):
+                    print(f"--- FDE report saved to {report_path} ---")
+                else:
+                    print(f"WARNING: Expected semantic artifact missing: {report_path}")
+            else:
+                print(f"WARNING: Skipping semantic phase, missing artifact: {module_graph_path}")
+        except Exception as exc:
+            print(f"ERROR: Semanticist phase failed: {exc}")
+
+        try:
+            self.run_archivist_phase(nodes=self._semantic_nodes)
         except Exception as exc:
             print(f"ERROR: Archivist phase failed: {exc}")
         finally:
@@ -224,7 +255,7 @@ class Orchestrator:
         if local_cleanup:
             self._cleanup_prepared_repo()
 
-    def run_archivist_phase(self) -> None:
+    def run_archivist_phase(self, nodes: list[dict] | None = None) -> None:
         """Generate human-readable summary docs from module and lineage artifacts."""
         module_graph_path = ".cartography/module_graph.json"
         lineage_graph_path = ".cartography/lineage_graph.json"
@@ -238,6 +269,9 @@ class Orchestrator:
             module_data = json.loads(file.read())
         with open(lineage_graph_path, "r", encoding="utf-8") as file:
             lineage_data = json.loads(file.read())
+
+        if nodes is not None:
+            module_data["nodes"] = nodes
 
         summary_path = self.archivist.generate_documents(module_data, lineage_data)
         print(f"--- Archivist phase complete. Generated summary at {summary_path} ---")

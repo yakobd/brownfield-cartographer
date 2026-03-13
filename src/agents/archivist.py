@@ -26,6 +26,24 @@ class ArchivistAgent:
             node_id = node.get("id")
             if node_id:
                 summary.append(f"- {node_id}\n")
+
+        summary.append("\n## Business Purpose Statements\n")
+        purpose_count = 0
+        for node in nodes:
+            semantic = node.get("semantic_analysis") if isinstance(node, dict) else None
+            if not isinstance(semantic, dict):
+                continue
+
+            purpose = semantic.get("purpose")
+            if not purpose:
+                continue
+
+            node_id = node.get("id", "unknown")
+            summary.append(f"- **{node_id}**: {purpose}\n")
+            purpose_count += 1
+
+        if purpose_count == 0:
+            summary.append("- No semantic purpose statements were generated.\n")
             
         report_path = os.path.join(self.output_dir, "README_SUMMARY.md")
         with open(report_path, "w", encoding="utf-8") as f:
