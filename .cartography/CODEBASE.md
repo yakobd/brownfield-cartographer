@@ -1,384 +1,2274 @@
-# Codebase Hub Summaries
-
-- C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\bin\dbt-create-staging-models.py: This script automates the generation of dbt source YAML files based on a given schema and table prefix, facilitating data modeling and transformation within a dbt project.
-  First 50 lines:
-1: #!/usr/bin/env python3
-2: # ruff: noqa: T201, BLE001, UP045
-3: """
-4: This script provides commands to generate dbt sources and staging models.
-5: It interacts with dbt to discover tables and generate the necessary YAML and SQL files.
-6: """
-7: 
-8: import json
-9: import re
-10: import subprocess
-11: from pathlib import Path
-12: from typing import Optional
-13: 
-14: import yaml
-15: from cyclopts import App
-16: 
-17: app = App()
-18: 
-19: 
-20: def extract_domain_from_prefix(prefix: str) -> str:
-21:     """
-22:     Extract the domain (second section) from a table prefix.
-23: 
-24:     Args:
-25:         prefix: The table prefix (e.g., 'raw__mitlearn__app__postgres__')
-26: 
-27:     Returns:
-28:         The domain name (e.g., 'mitlearn')
-29:     """
-30:     parts = prefix.split("__")
-31:     if len(parts) >= 2:  # noqa: PLR2004
-32:         return parts[1]
-33:     return ""
-34: 
-35: 
-36: def run_dbt_command(
-37:     dbt_project_dir: str, command: list[str], target: Optional[str]
-38: ) -> subprocess.CompletedProcess[str]:
-39:     """
-40:     Run a dbt command and captures its output.
-41: 
-42:     Args:
-43:         dbt_project_dir: The directory of the dbt project.
-44:         command: A list of strings representing the dbt command and its arguments.
-45:         target: The dbt target to use.
-46: 
-47:     Returns:
-48:         A CompletedProcess object containing the result of the dbt command.
-49:     """
-50:     # Check if this is a regular dbt command or a run-operation command
-
-- C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\bin\dbt-local-dev.py: This script provides a command-line interface for local dbt development using DuckDB and Iceberg, enabling registration of AWS Glue Iceberg tables as DuckDB views, testing Glue/Iceberg connectivity, and cleaning up Trino development schemas.
-  First 50 lines:
-1: #!/usr/bin/env python3
-2: # ruff: noqa: T201, FBT001, FBT002, S608, BLE001, C901, PLR0912, PLR0913, PLR0915, E501, RUF059, PT028, PLC0415, PLR2004, S607, RUF001
-3: """
-4: CLI tool for local dbt development with DuckDB + Iceberg.
-5: 
-6: This unified CLI provides commands for:
-7: - Registering AWS Glue Iceberg tables as DuckDB views
-8: - Testing Glue/Iceberg connectivity
-9: - Cleaning up Trino development schemas
-10: 
-11: Usage:
-12:     # Register all Iceberg tables from AWS Glue
-13:     python bin/dbt-local-dev.py register --all-layers
-14: 
-15:     # Test Glue/Iceberg connectivity
-16:     python bin/dbt-local-dev.py test
-17: 
-18:     # Clean up Trino dev schemas
-19:     python bin/dbt-local-dev.py cleanup --target dev_production --execute
-20: 
-21:     # Show help
-22:     python bin/dbt-local-dev.py --help
-23: """
-24: 
-25: import os
-26: import sys
-27: from concurrent.futures import ThreadPoolExecutor, as_completed
-28: from pathlib import Path
-29: from threading import Lock
-30: from typing import Annotated, Any, Literal
-31: 
-32: import boto3
-33: import cyclopts
-34: import duckdb
-35: import trino
-36: from trino.auth import OAuth2Authentication
-37: 
-38: # ============================================================================
-39: # Constants and Configuration
-40: # ============================================================================
-41: 
-42: DEFAULT_DUCKDB_PATH = Path.home() / ".ol-dbt" / "local.duckdb"
-43: DEFAULT_GLUE_DATABASE = "ol_warehouse_production_raw"
-44: 
-45: # Standard dbt layer databases (in dependency order)
-46: LAYER_DATABASES = [
-47:     "ol_warehouse_production_raw",
-48:     "ol_warehouse_production_staging",
-49:     "ol_warehouse_production_intermediate",
-50:     "ol_warehouse_production_dimensional",
-
-- C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\bin\uv-operations.py: This script automates the execution of 'uv' commands across multiple code repositories within a specified directory, streamlining dependency management and other project-related tasks.
-  First 50 lines:
-1: #!/usr/bin/env python3
-2: # ruff: noqa: T201
-3: """
-4: Script to run uv commands across all code locations in the dg_projects directory.
-5: 
-6: This script discovers all directories containing a pyproject.toml file and executes
-7: the specified uv command on each one.
-8: """
-9: 
-10: import subprocess
-11: import sys
-12: from pathlib import Path
-13: from typing import Annotated
-14: 
-15: from cyclopts import App, Parameter
-16: 
-17: app = App(help="Run uv commands across all code locations")
-18: 
-19: 
-20: class Colors:
-21:     """ANSI color codes for terminal output."""
-22: 
-23:     GREEN = "\033[0;32m"
-24:     BLUE = "\033[0;34m"
-25:     RED = "\033[0;31m"
-26:     YELLOW = "\033[1;33m"
-27:     NC = "\033[0m"  # No Color
-28: 
-29: 
-30: def find_code_locations(base_dir: Path) -> list[Path]:
-31:     """
-32:     Find all directories containing a pyproject.toml file.
-33: 
-34:     Args:
-35:         base_dir: The base directory to search for code locations.
-36: 
-37:     Returns:
-38:         A sorted list of Path objects for each code location.
-39:     """
-40:     locations = []
-41:     for item in base_dir.iterdir():
-42:         if item.is_dir() and (item / "pyproject.toml").exists():
-43:             locations.append(item)  # noqa: PERF401
-44:     return sorted(locations)
-45: 
-46: 
-47: def run_uv_command(location: Path, uv_args: list[str], verbose: bool = False) -> bool:  # noqa: FBT001, FBT002
-48:     """
-49:     Run uv command in the specified location.
-50: 
-
-- C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\bin\utils\chunk_tracking_logs_by_day.py: This script reorganizes tracking log files in an S3 bucket by date, moving or copying them from the root to date-based subdirectories within the destination bucket.
-  First 50 lines:
-1: #!/usr/bin/env python
-2: """
-3: Our tracking logs have gone through a few iterations of methods for loading them to S3.
-4: This is largely due to different agents being used for shipping the logs.  As a result,
-5: the path formatting for those logs is not consistent across time boundaries.
-6: 
-7: This script is designed to take a source bucket and a destination bucket, and process
-8: all files that are in the root of the bucket to be located in path prefixes that are
-9: chunked by date.
-10: """
-11: 
-12: import sys
-13: from datetime import UTC, datetime, timedelta
-14: from typing import Annotated
-15: 
-16: import typer
-17: from boto3 import client, resource
-18: 
-19: 
-20: def date_chunk_files(  # noqa: PLR0913
-21:     source_bucket: Annotated[
-22:         str,
-23:         typer.Argument(
-24:             help="The source bucket that tracking logs will be copied or moved from"
-25:         ),
-26:     ],
-27:     dest_bucket: Annotated[
-28:         str, typer.Argument(help="The bucket that the tracking logs will be written to")
-29:     ],
-30:     start_date: Annotated[
-31:         str,
-32:         typer.Option(
-33:             help="The date of the earliest tracking log to process "
-34:             "(based on the formatted file name). In %Y-%m-%d format"
-35:         ),
-36:     ] = "2017-01-01",
-37:     end_date: Annotated[
-38:         str | None,
-39:         typer.Option(
-40:             help="The date of the last tracking log to process "
-41:             "(based on the formatted file name). In %Y-%m-%d format"
-42:         ),
-43:     ] = None,
-44:     dry_run: Annotated[  # noqa: FBT002
-45:         bool,
-46:         typer.Option(
-47:             help="Set to True to just see what the source and destination paths "
-48:             "will be without performing any modifications"
-49:         ),
-50:     ] = True,
-
-- C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\dg_deployments\reconcile_edxorg_partitions.py: This script reconciles edxorg archive asset partitions and S3 objects with invalid course IDs caused by a parsing error, correcting S3 paths and re-emitting asset materializations under the canonical partition keys.
-  First 50 lines:
-1: # ruff: noqa: INP001
-2: """Reconcile edxorg archive asset partitions and S3 objects with invalid course IDs.
-3: 
-4: Partitions created between commit 2c2b9c3a (2026-02-11) and the subsequent fix
-5: have course_id values that incorrectly include a data-type suffix:
-6: 
-7:   Bad:       MITx-15.415x-3T2018-course|edge
-8:   Canonical: MITx-15.415x-3T2018|edge
-9: 
-10: This arises because ``parse_archive_path`` was not consuming the ``-course`` /
-11: ``-course_structure`` token that appears between the course run and the source-
-12: system marker in ``.json`` archive filenames, so the regex engine absorbed it
-13: into the course_id instead.
-14: 
-15: Impact by asset type
-16: --------------------
-17: * **course_structure** (``.json``) - wrong course_id in the S3 path AND the
-18:   partition key.  Object keys look like::
-19: 
-20:       edxorg/raw_data/course_structure/edge/MITx-15.415x-3T2018-course/<hash>.json
-21: 
-22:   These must be S3-copied to the canonical path *and* re-emitted with the
-23:   correct partition key and path metadata.
-24: 
-25: * **course_xml** (``.xml.tar.gz``) - same S3 path problem (the ``-course``
-26:   suffix in the filename was absorbed into course_id by the pre-existing regex
-27:   before 2c2b9c3a *and* continued afterwards).
-28: 
-29: * **db_table** (``.sql``) - course_id was always parsed correctly (the table-
-30:   name token was consumed by ``DATA_ATTRIBUTE_REGEX``), so **no S3 correction
-31:   is needed**.
-32: 
-33: * **forum_mongo** (``.mongo``) - filenames never carry a suffix before the
-34:   source-system marker, so course_id was always correct; **no S3 correction
-35:   needed**.
-36: 
-37: What this script does
-38: ---------------------
-39: 1. Lists all dynamic partition keys for ``course_and_source``.
-40: 2. Identifies keys whose course_id component ends in ``-course`` or
-41:    ``-course_structure``.
-42: 3. Adds the canonical (suffix-stripped) partition key if not already present.
-43: 4. For every asset materialisation event under the bad partition key:
-44: 
-45:    a. Inspects the ``object_key`` metadata field.
-46:    b. If that key embeds the wrong course_id as a path segment, S3-copies the
-47:       object to the corrected path (skipped if the destination already exists).
-48:    c. Re-emits an ``AssetMaterialisation`` under the canonical partition key
-49:       with updated ``object_key``, ``path``, and ``course_id`` metadata.
-50: 
-
-- C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\dg_projects\__init__.py: This file initializes the `dg_projects` package, likely setting up necessary configurations or importing modules for use within the package.
-  First 50 lines:
-
-
-- C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\dg_projects\b2b_organization\__init__.py: This file initializes the `b2b_organization` package, likely setting up necessary configurations or importing modules to define the structure and functionality related to business-to-business organization management within the larger data platform.
-  First 50 lines:
-
-
-- C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\dg_projects\b2b_organization\b2b_organization\definitions.py: This Dagster definitions file configures resources, assets, jobs, and sensors to orchestrate the export of B2B organization data to S3, handling Vault authentication and environment-specific bucket configurations.
-  First 50 lines:
-1: from b2b_organization.assets.data_export import export_b2b_organization_data
-2: from b2b_organization.sensors.b2b_organization import b2b_organization_list_sensor
-3: from dagster import (
-4:     Definitions,
-5:     define_asset_job,
-6: )
-7: from dagster_aws.s3 import S3Resource
-8: from ol_orchestrate.lib.constants import DAGSTER_ENV, VAULT_ADDRESS
-9: from ol_orchestrate.lib.dagster_helpers import (
-10:     default_file_object_io_manager,
-11:     default_io_manager,
-12: )
-13: from ol_orchestrate.lib.utils import authenticate_vault
-14: 
-15: b2b_bucket_map = {
-16:     "dev": {"bucket": "ol-devops-sandbox", "prefix": "pipeline-storage"},
-17:     "ci": {"bucket": "ol-b2b-partners-storage-ci", "prefix": ""},
-18:     "qa": {"bucket": "ol-b2b-partners-storage-qa", "prefix": ""},
-19:     "production": {"bucket": "ol-b2b-partners-storage-production", "prefix": ""},
-20: }
-21: 
-22: # Initialize vault with resilient loading
-23: try:
-24:     vault = authenticate_vault(DAGSTER_ENV, VAULT_ADDRESS)
-25:     vault_authenticated = True
-26: except Exception as e:  # noqa: BLE001 (resilient loading)
-27:     import warnings
-28: 
-29:     from ol_orchestrate.resources.secrets.vault import Vault
-30: 
-31:     warnings.warn(
-32:         f"Failed to authenticate with Vault: {e}. Using mock configuration.",
-33:         stacklevel=2,
-34:     )
-35:     vault = Vault(vault_addr=VAULT_ADDRESS, vault_auth_type="github")
-36:     vault_authenticated = False
-37: 
-38: 
-39: b2b_organization_data_export_job = define_asset_job(
-40:     name="b2b_organization_data_export_job",
-41:     selection=[export_b2b_organization_data],
-42: )
-43: 
-44: # Create unified definitions
-45: defs = Definitions(
-46:     resources={
-47:         "io_manager": default_io_manager(DAGSTER_ENV),
-48:         "s3file_io_manager": default_file_object_io_manager(
-49:             dagster_env=DAGSTER_ENV,
-50:             bucket=b2b_bucket_map[DAGSTER_ENV]["bucket"],
-
-- C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\dg_projects\b2b_organization\b2b_organization\__init__.py: This file initializes the `b2b_organization` Python package, likely setting up necessary configurations or importing modules for managing business-to-business organization-related functionalities.
-  First 50 lines:
-
-
-- C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\dg_projects\b2b_organization\b2b_organization\assets\data_export.py: This asset exports data from a dbt model related to organization administration, filtering it by organization key, saving it to a CSV file, and yielding an output with metadata including a data version based on the file's SHA256 hash.
-  First 50 lines:
-1: import hashlib
-2: from datetime import UTC, datetime
-3: from pathlib import Path
-4: 
-5: import polars as pl
-6: from b2b_organization.partitions.b2b_organization import (
-7:     b2b_organization_list_partitions,
-8: )
-9: from dagster import (
-10:     AssetExecutionContext,
-11:     AssetKey,
-12:     DataVersion,
-13:     Output,
-14:     asset,
-15: )
-16: from ol_orchestrate.lib.glue_helper import get_dbt_model_as_dataframe
-17: 
-18: 
-19: @asset(
-20:     code_version="b2b_organization_data_export_v1",
-21:     group_name="b2b_organization",
-22:     deps=[AssetKey(["reporting", "organization_administration_report"])],
-23:     partitions_def=b2b_organization_list_partitions,
-24:     io_manager_key="s3file_io_manager",
-25:     key=AssetKey(["b2b_organization", "administration_report_export"]),
-26: )
-27: def export_b2b_organization_data(context: AssetExecutionContext):
-28:     organization_key = context.partition_key
-29:     dbt_report_name = "organization_administration_report"
-30: 
-31:     data_df = get_dbt_model_as_dataframe(
-32:         database_name="ol_warehouse_production_reporting",
-33:         table_name=dbt_report_name,
-34:     )
-35:     organizational_data_df = data_df.filter(
-36:         pl.col("organization_key").eq(organization_key)
-37:     )
-38:     num_rows = organizational_data_df.select(pl.len()).collect().item()
-39:     context.log.info(
-40:         "%d rows in organization_administration_report for %s",
-41:         num_rows,
-42:         organization_key,
-43:     )
-44: 
-45:     export_date = datetime.now(tz=UTC).strftime("%Y-%m-%d")
-46: 
-47:     organizational_data_file = Path(
-48:         f"{organization_key}_{dbt_report_name}_{export_date}.csv"
-49:     )
-50:     organizational_data_df.sink_csv(str(organizational_data_file))
+# CODEBASE
+Architecture Overview:
+This CODEBASE summary combines module structure and lineage metadata to highlight where the system's architecture is concentrated, how data flows from ingestion to sink points, and where operational risk is likely to accumulate due to dependency complexity, documentation drift, or high change velocity.
+- Critical Path:
+- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\.pre-commit-config.yaml (PageRank: 0.000000)
+- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\build.yaml (PageRank: 0.000000)
+- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\docker-compose.yaml (PageRank: 0.000000)
+- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\.gemini\config.yaml (PageRank: 0.000000)
+- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\.github\workflows\project_automation.yaml (PageRank: 0.000000)
+- Data Sources & Sinks:
+Ingestion points:
+- source:ol_warehouse_production_dimensional.afact_course_page_engagement
+- source:ol_warehouse_production_dimensional.afact_discussion_engagement
+- source:ol_warehouse_production_dimensional.afact_problem_engagement
+- source:ol_warehouse_production_dimensional.dim_course_content
+- source:ol_warehouse_production_dimensional.dim_discussion_topic
+- source:ol_warehouse_production_dimensional.dim_problem
+- source:ol_warehouse_production_dimensional.dim_user
+- source:ol_warehouse_production_dimensional.dim_video
+- source:ol_warehouse_production_dimensional.tfact_problem_events
+- source:ol_warehouse_production_dimensional.tfact_video_events
+- source:ol_warehouse_production_intermediate.int__combined__course_runs
+- source:ol_warehouse_raw_data
+- source:reporting
+Output points:
+- sink:Enrollment_Activity_Counts_Dataset
+- sink:__micromasters__users
+- sink:__micromasters_course_certificates_dedp_from_micromasters
+- sink:__micromasters_course_certificates_dedp_from_mitxonline
+- sink:__micromasters_course_certificates_non_dedp_from_edxorg
+- sink:__micromasters_course_grades_dedp_from_micromasters
+- sink:__micromasters_course_grades_dedp_from_mitxonline
+- sink:__micromasters_course_grades_non_dedp_from_edxorg
+- sink:__micromasters_program_certificates_dedp_from_micromasters
+- sink:__micromasters_program_certificates_dedp_from_mitxonline
+- sink:__micromasters_program_certificates_non_dedp
+- sink:__mitxonline_good_economics_for_hard_times_program
+- sink:activated_on
+- sink:active_count
+- sink:activity_date
+- sink:address_country
+- sink:admitted_date
+- sink:afact_course_page_engagement
+- sink:afact_discussion_engagement
+- sink:afact_problem_engagement
+- sink:afact_video_engagement
+- sink:agent_message
+- sink:ai_agent
+- sink:answers
+- sink:any_dedp_program_cert_ind
+- sink:application_created_on
+- sink:application_id
+- sink:application_linkedin_url
+- sink:application_resume_file
+- sink:application_resume_uploaded_on
+- sink:application_state
+- sink:application_updated_on
+- sink:applicationstep_id
+- sink:applicationstep_step_order
+- sink:applicationstep_submission_type
+- sink:attempt
+- sink:attempted_true_cnt
+- sink:attempts_on_problem
+- sink:audit_count
+- sink:audit_id
+- sink:avatar_type
+- sink:avg_percent_grade
+- sink:b2b_contract_description
+- sink:b2b_contract_end_date
+- sink:b2b_contract_enrollment_fixed_price
+- sink:b2b_contract_id
+- sink:b2b_contract_integration_type
+- sink:b2b_contract_is_active
+- sink:b2b_contract_max_learners
+- sink:b2b_contract_membership_type
+- sink:b2b_contract_name
+- sink:b2b_contract_number
+- sink:b2b_contract_start_date
+- sink:b2bcoupon_activated_on
+- sink:b2bcoupon_coupon_code
+- sink:b2bcoupon_created_on
+- sink:b2bcoupon_discount_percent
+- sink:b2bcoupon_expires_on
+- sink:b2bcoupon_id
+- sink:b2bcoupon_is_enabled
+- sink:b2bcoupon_is_reusable
+- sink:b2bcoupon_name
+- sink:b2bcoupon_updated_on
+- sink:b2bcouponaudit_acting_user_id
+- sink:b2bcouponaudit_created_on
+- sink:b2bcouponaudit_data_after
+- sink:b2bcouponaudit_data_before
+- sink:b2bcouponaudit_id
+- sink:b2bcouponaudit_updated_on
+- sink:b2bcouponredemption_created_on
+- sink:b2bcouponredemption_id
+- sink:b2bcouponredemption_updated_on
+- sink:b2border_contract_number
+- sink:b2border_created_on
+- sink:b2border_discount
+- sink:b2border_email
+- sink:b2border_id
+- sink:b2border_num_seats
+- sink:b2border_per_item_price
+- sink:b2border_status
+- sink:b2border_total_price
+- sink:b2border_unique_uuid
+- sink:b2border_updated_on
+- sink:b2borderaudit_acting_user_id
+- sink:b2borderaudit_created_on
+- sink:b2borderaudit_data_after
+- sink:b2borderaudit_data_before
+- sink:b2borderaudit_id
+- sink:b2borderaudit_updated_on
+- sink:b2breceipt_authorization_code
+- sink:b2breceipt_bill_to_address_country
+- sink:b2breceipt_bill_to_address_state
+- sink:b2breceipt_created_on
+- sink:b2breceipt_data
+- sink:b2breceipt_id
+- sink:b2breceipt_payment_method
+- sink:b2breceipt_reference_number
+- sink:b2breceipt_transaction_id
+- sink:b2breceipt_transaction_status
+- sink:b2breceipt_updated_on
+- sink:base_contenttype_id
+- sink:basket_created_on
+- sink:basket_id
+- sink:basket_updated_on
+- sink:basketdiscount_applied_on
+- sink:basketdiscount_created_on
+- sink:basketdiscount_id
+- sink:basketdiscount_updated_on
+- sink:basketitem_created_on
+- sink:basketitem_id
+- sink:basketitem_quantity
+- sink:basketitem_updated_on
+- sink:basketrunselection_created_on
+- sink:basketrunselection_id
+- sink:basketrunselection_updated_on
+- sink:birth_year
+- sink:block_category
+- sink:block_completed
+- sink:block_fk
+- sink:block_id
+- sink:block_index
+- sink:block_key
+- sink:block_metadata
+- sink:block_name
+- sink:block_title
+- sink:blockcompletion_created_on
+- sink:blockcompletion_id
+- sink:blockcompletion_updated_on
+- sink:blockedcountry_code
+- sink:blockedcountry_created_on
+- sink:blockedcountry_id
+- sink:blockedcountry_updated_on
+- sink:brand_api_url
+- sink:brand_created_at
+- sink:brand_has_help_center
+- sink:brand_help_center_state
+- sink:brand_id
+- sink:brand_is_active
+- sink:brand_is_default
+- sink:brand_is_deleted
+- sink:brand_name
+- sink:brand_subdomain
+- sink:brand_updated_at
+- sink:brand_url
+- sink:bulkcouponassignment_assignment_sheet_id
+- sink:bulkcouponassignment_assignments_started_on
+- sink:bulkcouponassignment_created_on
+- sink:bulkcouponassignment_id
+- sink:bulkcouponassignment_last_assignment_on
+- sink:bulkcouponassignment_message_delivery_completed_on
+- sink:bulkcouponassignment_sheet_last_modified_on
+- sink:bulkcouponassignment_updated_on
+- sink:canvas_course_id
+- sink:capstone_ind
+- sink:capstone_indicator
+- sink:category_name
+- sink:certificate_count
+- sink:certificate_desired
+- sink:certificate_page_revision_id
+- sink:certification_type
+- sink:chapter_block_fk
+- sink:chapter_block_id
+- sink:chapter_id
+- sink:chapter_name
+- sink:chapter_title
+- sink:chatbot_source
+- sink:chatbot_type
+- sink:chatbot_usage_report
+- sink:chatbot_used_count
+- sink:chatsession_agent
+- sink:chatsession_created_on
+- sink:chatsession_django_session_key
+- sink:chatsession_id
+- sink:chatsession_object_id
+- sink:chatsession_thread_id
+- sink:chatsession_title
+- sink:chatsession_updated_on
+- sink:cheating_detection_report
+- sink:checkpoint_created_on
+- sink:checkpoint_id
+- sink:checkpoint_json
+- sink:checkpoint_metadata
+- sink:checkpoint_namespace
+- sink:checkpoint_source
+- sink:checkpoint_step
+- sink:checkpoint_type
+- sink:cms_certificate_ceus
+- sink:cms_certificate_institute_text
+- sink:cms_certificate_overrides
+- sink:cms_certificate_product_name
+- sink:cms_certificate_signitory_ids
+- sink:cms_coursepage_catalog_details
+- sink:cms_coursepage_description
+- sink:cms_coursepage_duration
+- sink:cms_coursepage_external_marketing_url
+- sink:cms_coursepage_first_published_on
+- sink:cms_coursepage_format
+- sink:cms_coursepage_is_live
+- sink:cms_coursepage_last_published_on
+- sink:cms_coursepage_model
+- sink:cms_coursepage_slug
+- sink:cms_coursepage_subhead
+- sink:cms_coursepage_time_commitment
+- sink:cms_coursepage_url_path
+- sink:cms_coursesinprogrampage_body
+- sink:cms_coursesinprogrampage_coursepage_wagtail_page_ids
+- sink:cms_coursesinprogrampage_heading
+- sink:cms_facultymemberspage_faculty
+- sink:cms_facultymemberspage_facultymember_description
+- sink:cms_facultymemberspage_facultymember_name
+- sink:cms_facultymemberspage_heading
+- sink:cms_facultymemberspage_subhead
+- sink:cms_programpage_catalog_details
+- sink:cms_programpage_description
+- sink:cms_programpage_duration
+- sink:cms_programpage_external_marketing_url
+- sink:cms_programpage_first_published_on
+- sink:cms_programpage_format
+- sink:cms_programpage_is_featured
+- sink:cms_programpage_is_live
+- sink:cms_programpage_last_published_on
+- sink:cms_programpage_model
+- sink:cms_programpage_slug
+- sink:cms_programpage_subhead
+- sink:cms_programpage_time_commitment
+- sink:cms_programpage_url_path
+- sink:cms_signatorypage_name
+- sink:cms_signatorypage_organization
+- sink:cms_signatorypage_title_1
+- sink:cms_signatorypage_title_2
+- sink:collection_created_on
+- sink:collection_description
+- sink:collection_id
+- sink:collection_is_allowed_to_share
+- sink:collection_is_logged_in_only
+- sink:collection_slug
+- sink:collection_stream_source
+- sink:collection_title
+- sink:collection_updated_on
+- sink:collection_user_id
+- sink:collection_uuid
+- sink:collectionedxendpoint_id
+- sink:combined_enrollments_with_gender_and_date
+- sink:combined_orders_hash_id
+- sink:combined_video_engagements_counts_report
+- sink:comment_attachments
+- sink:comment_author
+- sink:comment_author_user_id
+- sink:comment_body_string
+- sink:comment_created_at
+- sink:comment_html_body
+- sink:comment_id
+- sink:comment_is_public
+- sink:comment_plain_body
+- sink:comment_source_channel
+- sink:comment_source_email
+- sink:comment_source_rel
+- sink:comment_type
+- sink:comment_unix_timestamp
+- sink:comment_uploads
+- sink:comment_via_object
+- sink:commentable_id
+- sink:company
+- sink:company_created_on
+- sink:company_id
+- sink:company_name
+- sink:company_updated_on
+- sink:completed_course_on
+- sink:completed_onboarding
+- sink:consecutive_days_visit_count
+- sink:content_block_fk
+- sink:content_block_pk
+- sink:content_type
+- sink:contenttype_full_name
+- sink:contenttype_id
+- sink:continuing_education_credits
+- sink:correct_true_cnt
+- sink:country
+- sink:countryincomethreshold_country_code
+- sink:countryincomethreshold_created_on
+- sink:countryincomethreshold_id
+- sink:countryincomethreshold_income_threshold
+- sink:countryincomethreshold_updated_on
+- sink:coupon_activated_on
+- sink:coupon_amount
+- sink:coupon_amount_type
+- sink:coupon_applies_to_future_runs
+- sink:coupon_code
+- sink:coupon_created_on
+- sink:coupon_discount_amount_text
+- sink:coupon_expires_on
+- sink:coupon_id
+- sink:coupon_is_active
+- sink:coupon_is_global
+- sink:coupon_name
+- sink:coupon_object_id
+- sink:coupon_redeemed_on
+- sink:coupon_source_table
+- sink:coupon_type
+- sink:coupon_updated_on
+- sink:couponbasket_created_on
+- sink:couponbasket_id
+- sink:couponbasket_updated_on
+- sink:couponinvoice_description
+- sink:couponinvoice_id
+- sink:couponinvoice_number
+- sink:couponpayment_created_on
+- sink:couponpayment_id
+- sink:couponpayment_name
+- sink:couponpayment_updated_on
+- sink:couponpaymentversion_activated_on
+- sink:couponpaymentversion_coupon_type
+- sink:couponpaymentversion_created_on
+- sink:couponpaymentversion_discount_amount
+- sink:couponpaymentversion_discount_amount_text
+- sink:couponpaymentversion_discount_source
+- sink:couponpaymentversion_discount_type
+- sink:couponpaymentversion_expires_on
+- sink:couponpaymentversion_id
+- sink:couponpaymentversion_is_automatic
+- sink:couponpaymentversion_max_redemptions
+- sink:couponpaymentversion_max_redemptions_per_user
+- sink:couponpaymentversion_num_coupon_codes
+- sink:couponpaymentversion_payment_transaction
+- sink:couponpaymentversion_tag
+- sink:couponpaymentversion_updated_on
+- sink:couponproduct_created_on
+- sink:couponproduct_id
+- sink:couponproduct_updated_on
+- sink:couponredemption_created_on
+- sink:couponredemption_id
+- sink:couponredemption_updated_on
+- sink:coupons_used_count
+- sink:couponversion_created_on
+- sink:couponversion_id
+- sink:couponversion_updated_on
+- sink:course_about
+- sink:course_advanced_module_array
+- sink:course_certificates
+- sink:course_certification_type
+- sink:course_contact_email
+- sink:course_created_on
+- sink:course_department_name
+- sink:course_department_number
+- sink:course_department_numbers
+- sink:course_department_numbers_json
+- sink:course_description
+- sink:course_discussion_settings_object
+- sink:course_edx_key
+- sink:course_edx_readable_id
+- sink:course_effort
+- sink:course_extra_course_numbers
+- sink:course_faq_url
+- sink:course_first_published_on
+- sink:course_full_description
+- sink:course_has_never_published
+- sink:course_id
+- sink:course_image_url
+- sink:course_instructor_first_name
+- sink:course_instructor_last_name
+- sink:course_instructor_middle_initial
+- sink:course_instructor_salutation
+- sink:course_instructor_title
+- sink:course_instructor_uuid
+- sink:course_instructor_uuids
+- sink:course_instructors
+- sink:course_is_external
+- sink:course_is_live
+- sink:course_is_unpublished
+- sink:course_learning_resource_types
+- sink:course_length
+- sink:course_level
+- sink:course_live_url
+- sink:course_marketing_url
+- sink:course_name
+- sink:course_number
+- sink:course_organizations
+- sink:course_page_first_published_on
+- sink:course_page_is_live
+- sink:course_page_last_published_on
+- sink:course_page_slug
+- sink:course_page_url_path
+- sink:course_position_in_program
+- sink:course_prerequisites
+- sink:course_prerequisites_text
+- sink:course_price
+- sink:course_primary_course_number
+- sink:course_publish_date_updated_on
+- sink:course_readable_id
+- sink:course_short_id
+- sink:course_should_display_progress
+- sink:course_source
+- sink:course_speciality
+- sink:course_subtopic
+- sink:course_term
+- sink:course_title
+- sink:course_topic
+- sink:course_topics
+- sink:course_type
+- sink:course_updated_at
+- sink:course_updated_on
+- sink:course_url_path
+- sink:course_uuid
+- sink:course_video_url
+- sink:course_what_you_learn
+- sink:course_year
+- sink:courseaccess_role
+- sink:courseaccessrole_id
+- sink:courseactivitiy_average_time_diff_in_sec
+- sink:courseactivitiy_first_event_timestamp
+- sink:courseactivitiy_last_event_timestamp
+- sink:courseactivitiy_max_diff_in_sec
+- sink:courseactivitiy_num_activity_days
+- sink:courseactivitiy_num_consecutive_events_used
+- sink:courseactivitiy_num_events
+- sink:courseactivitiy_num_pause_video
+- sink:courseactivitiy_num_play_video
+- sink:courseactivitiy_num_problem_check
+- sink:courseactivitiy_num_progress_check
+- sink:courseactivitiy_num_seek_video
+- sink:courseactivitiy_num_seq_goto
+- sink:courseactivitiy_num_show_answer
+- sink:courseactivitiy_num_show_transcript
+- sink:courseactivitiy_num_unique_videos_viewed
+- sink:courseactivitiy_num_video_interactions
+- sink:courseactivitiy_percentage_total_videos_watched
+- sink:courseactivitiy_standard_deviation_in_sec
+- sink:courseactivitiy_total_elapsed_time_in_sec
+- sink:courseactivitiy_viewed_half
+- sink:courseactivitiy_visited_once
+- sink:courseactivity_date
+- sink:courseactivity_first_event_timestamp
+- sink:courseactivity_last_activity_date
+- sink:courseactivity_last_event_timestamp
+- sink:courseactivity_last_play_video_timestamp
+- sink:courseactivity_last_problem_check_timestamp
+- sink:courseactivity_num_chapters_visited
+- sink:courseactivity_num_days_activity
+- sink:courseactivity_num_events
+- sink:courseactivity_num_play_video
+- sink:courseactivity_num_unique_play_video
+- sink:coursecertificate_created_on
+- sink:coursecertificate_hash
+- sink:coursecertificate_id
+- sink:coursecertificate_updated_on
+- sink:coursecertificate_url
+- sink:coursedepartment_created_on
+- sink:coursedepartment_id
+- sink:coursedepartment_name
+- sink:coursedepartment_number
+- sink:coursedepartment_updated_on
+- sink:coursegrade_created_on
+- sink:coursegrade_grade
+- sink:coursegrade_id
+- sink:coursegrade_updated_on
+- sink:courserun_announce_on
+- sink:courserun_applicationstep_due_date
+- sink:courserun_applicationstep_id
+- sink:courserun_availability
+- sink:courserun_certificate_available_on
+- sink:courserun_course_number
+- sink:courserun_created_on
+- sink:courserun_duration
+- sink:courserun_edx_readable_id
+- sink:courserun_edxorg_readable_id
+- sink:courserun_end_date
+- sink:courserun_end_on
+- sink:courserun_enrollment_end_date
+- sink:courserun_enrollment_end_on
+- sink:courserun_enrollment_mode
+- sink:courserun_enrollment_modes
+- sink:courserun_enrollment_start_date
+- sink:courserun_enrollment_start_on
+- sink:courserun_enrollment_url
+- sink:courserun_estimated_hours
+- sink:courserun_expired_on
+- sink:courserun_external_readable_id
+- sink:courserun_full_description
+- sink:courserun_grade_freeze_on
+- sink:courserun_id
+- sink:courserun_image_url
+- sink:courserun_institution
+- sink:courserun_instructors
+- sink:courserun_is_current
+- sink:courserun_is_discontinued
+- sink:courserun_is_eligible_for_financial_aid
+- sink:courserun_is_enrollable
+- sink:courserun_is_live
+- sink:courserun_is_published
+- sink:courserun_is_self_paced
+- sink:courserun_languages
+- sink:courserun_level
+- sink:courserun_marketing_url
+- sink:courserun_max_weekly_hours
+- sink:courserun_min_weekly_hours
+- sink:courserun_mode
+- sink:courserun_old_readable_id
+- sink:courserun_org
+- sink:courserun_pace
+- sink:courserun_passing_grade
+- sink:courserun_platform
+- sink:courserun_prerequisites
+- sink:courserun_readable_id
+- sink:courserun_semester
+- sink:courserun_short_description
+- sink:courserun_start_date
+- sink:courserun_start_on
+- sink:courserun_status
+- sink:courserun_tabs_array
+- sink:courserun_tag
+- sink:courserun_time_commitment
+- sink:courserun_title
+- sink:courserun_updated_at
+- sink:courserun_updated_on
+- sink:courserun_upgrade_deadline
+- sink:courserun_url
+- sink:courserun_video_url
+- sink:courseruncertificate_courserun_readable_id
+- sink:courseruncertificate_created_on
+- sink:courseruncertificate_distinction
+- sink:courseruncertificate_download_url
+- sink:courseruncertificate_download_uuid
+- sink:courseruncertificate_grade
+- sink:courseruncertificate_id
+- sink:courseruncertificate_is_earned
+- sink:courseruncertificate_is_revoked
+- sink:courseruncertificate_key
+- sink:courseruncertificate_mode
+- sink:courseruncertificate_name
+- sink:courseruncertificate_status
+- sink:courseruncertificate_updated_on
+- sink:courseruncertificate_url
+- sink:courseruncertificate_user_full_name
+- sink:courseruncertificate_user_id
+- sink:courseruncertificate_uuid
+- sink:courseruncertificate_verify_uuid
+- sink:courserunenrollment_courserun_readable_id
+- sink:courserunenrollment_created_on
+- sink:courserunenrollment_created_on_date
+- sink:courserunenrollment_enrolled_on
+- sink:courserunenrollment_enrollment_mode
+- sink:courserunenrollment_enrollment_status
+- sink:courserunenrollment_has_edx_email_subscription
+- sink:courserunenrollment_id
+- sink:courserunenrollment_is_active
+- sink:courserunenrollment_is_certificate_blocked
+- sink:courserunenrollment_is_edx_enrolled
+- sink:courserunenrollment_mode
+- sink:courserunenrollment_novoed_sync_on
+- sink:courserunenrollment_platform
+- sink:courserunenrollment_unenrolled_on
+- sink:courserunenrollment_updated_on
+- sink:courserunenrollment_upgraded_on
+- sink:courserungrade_courserun_paid_on_edx
+- sink:courserungrade_created_on
+- sink:courserungrade_first_passed_on
+- sink:courserungrade_grade
+- sink:courserungrade_grading_policy_hash
+- sink:courserungrade_id
+- sink:courserungrade_is_passing
+- sink:courserungrade_is_set_by_admin
+- sink:courserungrade_letter_grade
+- sink:courserungrade_passed_on
+- sink:courserungrade_passing_grade
+- sink:courserungrade_status
+- sink:courserungrade_updated_on
+- sink:courserungrade_user_grade
+- sink:courses_taken_in_program
+- sink:coursestructure_block_category
+- sink:coursestructure_block_content_hash
+- sink:coursestructure_block_id
+- sink:coursestructure_block_index
+- sink:coursestructure_block_metadata
+- sink:coursestructure_block_title
+- sink:coursestructure_chapter_id
+- sink:coursestructure_chapter_title
+- sink:coursestructure_content_hash
+- sink:coursestructure_is_latest
+- sink:coursestructure_parent_block_id
+- sink:coursestructure_retrieved_at
+- sink:coursetodepartment_id
+- sink:coursetopic_created_on
+- sink:coursetopic_id
+- sink:coursetopic_name
+- sink:coursetopic_names
+- sink:coursetopic_parent_coursetopic_id
+- sink:coursetopic_parent_id
+- sink:coursetopic_updated_on
+- sink:coursevideo_id
+- sink:coursevideo_is_hidden
+- sink:courseware_format
+- sink:courseware_id
+- sink:courseware_object_id
+- sink:courseware_type
+- sink:created
+- sink:created_on
+- sink:created_timestamp
+- sink:credit_hours
+- sink:credit_provider
+- sink:currency
+- sink:currencyexchangerate_created_on
+- sink:currencyexchangerate_currency_code
+- sink:currencyexchangerate_description
+- sink:currencyexchangerate_exchange_rate
+- sink:currencyexchangerate_id
+- sink:currencyexchangerate_updated_on
+- sink:current_grade
+- sink:custom_status_id
+- sink:date_created
+- sink:date_joined
+- sink:date_of_birth
+- sink:dedp_course_cert_count
+- sink:dedp_international_program_cert_ind
+- sink:dedp_public_policy_program_cert_ind
+- sink:delivery
+- sink:delivery_preference
+- sink:department_name
+- sink:description
+- sink:dim_course_content
+- sink:dim_discussion_topic
+- sink:dim_platform
+- sink:dim_problem
+- sink:dim_user
+- sink:dim_video
+- sink:discount
+- sink:discount_activated_on
+- sink:discount_amount
+- sink:discount_amount_text
+- sink:discount_code
+- sink:discount_created_on
+- sink:discount_expires_on
+- sink:discount_id
+- sink:discount_max_redemptions
+- sink:discount_name
+- sink:discount_redemption_type
+- sink:discount_source
+- sink:discount_type
+- sink:discount_updated_on
+- sink:discountproduct_created_on
+- sink:discountproduct_id
+- sink:discountproduct_updated_on
+- sink:discountredemption_id
+- sink:discountredemption_timestamp
+- sink:discounts_used_count
+- sink:discussion_component_id
+- sink:discussion_component_name
+- sink:discussion_event_path
+- sink:discussion_event_timestamp
+- sink:discussion_event_type
+- sink:discussion_id
+- sink:discussion_name
+- sink:discussion_topic_fk
+- sink:discussion_topic_id
+- sink:discussion_topic_name
+- sink:discussion_topic_pk
+- sink:discussion_type
+- sink:display_coursenumber
+- sink:display_tag_filter_strategy
+- sink:djangocheckpoint_id
+- sink:duration
+- sink:earned_all
+- sink:earned_graded
+- sink:ecommerce_company_id
+- sink:ecommerce_order_id
+- sink:edx_module_id
+- sink:edx_video_id
+- sink:edxendpoint_base_url
+- sink:edxendpoint_created_on
+- sink:edxendpoint_edx_video_api_path
+- sink:edxendpoint_id
+- sink:edxendpoint_name
+- sink:edxendpoint_updated_on
+- sink:edxorg_openedx_user_id
+- sink:edxorg_to_mitxonline_course_runs
+- sink:edxorg_to_mitxonline_enrollments
+- sink:edxorg_to_mitxonline_users
+- sink:electiveset_id
+- sink:electiveset_required_number
+- sink:electiveset_title
+- sink:electivesettocourse_id
+- sink:email
+- sink:email_key
+- sink:email_opted_in
+- sink:email_optout_id
+- sink:email_tag_filter_strategy
+- sink:emeritus_user_id
+- sink:encodejob_created_on
+- sink:encodejob_id
+- sink:encodejob_message
+- sink:encodejob_state
+- sink:encodejob_updated_on
+- sink:end_date
+- sink:ending_position
+- sink:engagement_problem_completion_raw
+- sink:engagement_problem_completion_summary
+- sink:enrolled_count
+- sink:enrolled_indicator
+- sink:enrollment_count
+- sink:enrollment_created_on
+- sink:enrollment_detail_report
+- sink:enrollment_end
+- sink:enrollment_start
+- sink:enrollment_status
+- sink:enrollment_type
+- sink:enrollment_updated_on
+- sink:estimated_time_played
+- sink:event_json
+- sink:event_timestamp
+- sink:event_type
+- sink:event_value
+- sink:ever_active_indicator
+- sink:exam_indicator
+- sink:exam_series_code
+- sink:examrun_courserun_readable_id
+- sink:examrun_created_on
+- sink:examrun_description
+- sink:examrun_id
+- sink:examrun_is_authorized
+- sink:examrun_passing_grade
+- sink:examrun_readable_id
+- sink:examrun_semester
+- sink:examrun_updated_on
+- sink:expiration_date
+- sink:expires_on
+- sink:external_resource_backup_url
+- sink:external_resource_backup_url_status_code
+- sink:external_resource_is_broken
+- sink:external_resource_license_warning
+- sink:external_resource_url
+- sink:external_resource_url_status_code
+- sink:field_api_url
+- sink:field_created_at
+- sink:field_description
+- sink:field_id
+- sink:field_is_active
+- sink:field_title
+- sink:field_updated_at
+- sink:first_attempted
+- sink:first_course_start_datetime
+- sink:first_name
+- sink:flexiblepriceapplication_cms_submission_id
+- sink:flexiblepriceapplication_country_of_income
+- sink:flexiblepriceapplication_country_of_residence
+- sink:flexiblepriceapplication_created_on
+- sink:flexiblepriceapplication_date_documents_sent
+- sink:flexiblepriceapplication_exchange_rate_timestamp
+- sink:flexiblepriceapplication_id
+- sink:flexiblepriceapplication_income_usd
+- sink:flexiblepriceapplication_justification
+- sink:flexiblepriceapplication_original_currency
+- sink:flexiblepriceapplication_original_income
+- sink:flexiblepriceapplication_status
+- sink:flexiblepriceapplication_updated_on
+- sink:flexiblepricetier_created_on
+- sink:flexiblepricetier_id
+- sink:flexiblepricetier_income_threshold_usd
+- sink:flexiblepricetier_is_current
+- sink:flexiblepricetier_updated_on
+- sink:full_name
+- sink:gender
+- sink:global_alumni_user_id
+- sink:goals
+- sink:grade
+- sink:grades
+- sink:grading_policy_hash
+- sink:group_api_url
+- sink:group_created_at
+- sink:group_description
+- sink:group_id
+- sink:group_is_default
+- sink:group_is_deleted
+- sink:group_is_public
+- sink:group_name
+- sink:group_updated_at
+- sink:has_dedp_program_certificate
+- sink:has_program_certificate
+- sink:hash_id
+- sink:hashed_user_email
+- sink:highest_education
+- sink:html5_sources
+- sink:human_message
+- sink:hw_indicator
+- sink:id
+- sink:ignored_tags
+- sink:image_alt_text
+- sink:image_caption
+- sink:image_credit
+- sink:industry
+- sink:installment_amount
+- sink:installment_deadline
+- sink:installment_id
+- sink:instructor_bio_long
+- sink:instructor_bio_short
+- sink:instructor_module_report
+- sink:instructor_name
+- sink:instructor_title
+- sink:instructor_wagtail_page_id
+- sink:instructors
+- sink:int__bootcamps__applications
+- sink:int__bootcamps__course_runs
+- sink:int__bootcamps__courserun_certificates
+- sink:int__bootcamps__courserunenrollments
+- sink:int__bootcamps__courses
+- sink:int__bootcamps__ecommerce_order
+- sink:int__bootcamps__ecommerce_receipt
+- sink:int__bootcamps__ecommerce_wiretransferreceipt
+- sink:int__bootcamps__users
+- sink:int__combined__course_runs
+- sink:int__combined__course_structure
+- sink:int__combined__course_videos
+- sink:int__combined__courserun_certificates
+- sink:int__combined__courserun_enrollments
+- sink:int__combined__user_course_roles
+- sink:int__combined__users
+- sink:int__edxorg__mitx_course_structure
+- sink:int__edxorg__mitx_courserun_certificates
+- sink:int__edxorg__mitx_courserun_enrollments
+- sink:int__edxorg__mitx_courserun_grades
+- sink:int__edxorg__mitx_courseruns
+- sink:int__edxorg__mitx_product
+- sink:int__edxorg__mitx_program_certificates
+- sink:int__edxorg__mitx_program_courses
+- sink:int__edxorg__mitx_program_enrollments
+- sink:int__edxorg__mitx_user_activity
+- sink:int__edxorg__mitx_user_courseactivities
+- sink:int__edxorg__mitx_user_courseactivities_daily
+- sink:int__edxorg__mitx_user_courseactivity_discussion
+- sink:int__edxorg__mitx_user_courseactivity_problemcheck
+- sink:int__edxorg__mitx_user_courseactivity_problemsubmitted
+- sink:int__edxorg__mitx_user_courseactivity_video
+- sink:int__edxorg__mitx_users
+- sink:int__learn_ai__chatbot
+- sink:int__learn_ai__tutorbot
+- sink:int__micromasters__course_certificates
+- sink:int__micromasters__course_enrollments
+- sink:int__micromasters__course_grades
+- sink:int__micromasters__dedp_proctored_exam_grades
+- sink:int__micromasters__orders
+- sink:int__micromasters__program_certificates
+- sink:int__micromasters__program_enrollments
+- sink:int__micromasters__program_requirements
+- sink:int__micromasters__programs
+- sink:int__micromasters__users
+- sink:int__mitx__courserun_certificates
+- sink:int__mitx__courserun_enrollments
+- sink:int__mitx__courserun_enrollments_with_programs
+- sink:int__mitx__courserun_grades
+- sink:int__mitx__courses
+- sink:int__mitx__program_certificates
+- sink:int__mitx__program_requirements
+- sink:int__mitx__programs
+- sink:int__mitx__users
+- sink:int__mitxonline__b2b_contract_to_courseruns
+- sink:int__mitxonline__bulk_email_optin
+- sink:int__mitxonline__course_blockedcountries
+- sink:int__mitxonline__course_instructors
+- sink:int__mitxonline__course_runs
+- sink:int__mitxonline__course_structure
+- sink:int__mitxonline__course_to_departments
+- sink:int__mitxonline__course_to_topics
+- sink:int__mitxonline__courserun_certificates
+- sink:int__mitxonline__courserun_grades
+- sink:int__mitxonline__courserun_subsection_grades
+- sink:int__mitxonline__courserun_videos
+- sink:int__mitxonline__courserunenrollments
+- sink:int__mitxonline__courserunenrollments_with_programs
+- sink:int__mitxonline__courses
+- sink:int__mitxonline__ecommerce_basket
+- sink:int__mitxonline__ecommerce_basketdiscount
+- sink:int__mitxonline__ecommerce_basketitem
+- sink:int__mitxonline__ecommerce_discount
+- sink:int__mitxonline__ecommerce_discountproduct
+- sink:int__mitxonline__ecommerce_discountredemption
+- sink:int__mitxonline__ecommerce_order
+- sink:int__mitxonline__ecommerce_product
+- sink:int__mitxonline__ecommerce_transaction
+- sink:int__mitxonline__ecommerce_userdiscount
+- sink:int__mitxonline__flexiblepricing_countryincomethreshold
+- sink:int__mitxonline__flexiblepricing_currencyexchangerate
+- sink:int__mitxonline__flexiblepricing_flexiblepriceapplication
+- sink:int__mitxonline__flexiblepricing_flexiblepricetier
+- sink:int__mitxonline__proctored_exam_grades
+- sink:int__mitxonline__program_certificates
+- sink:int__mitxonline__program_instructors
+- sink:int__mitxonline__program_requirements
+- sink:int__mitxonline__programenrollments
+- sink:int__mitxonline__programs
+- sink:int__mitxonline__user_courseactivities
+- sink:int__mitxonline__user_courseactivities_daily
+- sink:int__mitxonline__user_courseactivity_discussion
+- sink:int__mitxonline__user_courseactivity_problemcheck
+- sink:int__mitxonline__user_courseactivity_problemsubmitted
+- sink:int__mitxonline__user_courseactivity_showanswer
+- sink:int__mitxonline__user_courseactivity_video
+- sink:int__mitxonline__users
+- sink:int__mitxpro__b2becommerce_b2bcoupon
+- sink:int__mitxpro__b2becommerce_b2bcouponredemption
+- sink:int__mitxpro__b2becommerce_b2border
+- sink:int__mitxpro__b2becommerce_b2breceipt
+- sink:int__mitxpro__course_runs
+- sink:int__mitxpro__course_structure
+- sink:int__mitxpro__courserun_certificates
+- sink:int__mitxpro__courserun_grades
+- sink:int__mitxpro__courserun_videos
+- sink:int__mitxpro__courserunenrollments
+- sink:int__mitxpro__courses
+- sink:int__mitxpro__courses_to_topics
+- sink:int__mitxpro__coursesfaculty
+- sink:int__mitxpro__coursesinprogram
+- sink:int__mitxpro__coursetopic
+- sink:int__mitxpro__ecommerce_allcoupons
+- sink:int__mitxpro__ecommerce_allorders
+- sink:int__mitxpro__ecommerce_basket
+- sink:int__mitxpro__ecommerce_basketitem
+- sink:int__mitxpro__ecommerce_basketrunselection
+- sink:int__mitxpro__ecommerce_company
+- sink:int__mitxpro__ecommerce_coupon
+- sink:int__mitxpro__ecommerce_couponpaymentversion
+- sink:int__mitxpro__ecommerce_couponproduct
+- sink:int__mitxpro__ecommerce_couponredemption
+- sink:int__mitxpro__ecommerce_couponversion
+- sink:int__mitxpro__ecommerce_line
+- sink:int__mitxpro__ecommerce_linerunselection
+- sink:int__mitxpro__ecommerce_order
+- sink:int__mitxpro__ecommerce_product
+- sink:int__mitxpro__ecommerce_productcouponassignment
+- sink:int__mitxpro__ecommerce_productversion
+- sink:int__mitxpro__ecommerce_receipt
+- sink:int__mitxpro__platforms
+- sink:int__mitxpro__program_certificates
+- sink:int__mitxpro__program_runs
+- sink:int__mitxpro__programenrollments
+- sink:int__mitxpro__programs
+- sink:int__mitxpro__programsfaculty
+- sink:int__mitxpro__user_courseactivities
+- sink:int__mitxpro__user_courseactivities_daily
+- sink:int__mitxpro__user_courseactivity_discussion
+- sink:int__mitxpro__user_courseactivity_problemcheck
+- sink:int__mitxpro__user_courseactivity_problemsubmitted
+- sink:int__mitxpro__user_courseactivity_showanswer
+- sink:int__mitxpro__user_courseactivity_video
+- sink:int__mitxpro__users
+- sink:int__mitxresidential__course_structure
+- sink:int__mitxresidential__courserun_enrollments
+- sink:int__mitxresidential__courserun_grades
+- sink:int__mitxresidential__courserun_videos
+- sink:int__mitxresidential__courseruns
+- sink:int__mitxresidential__user_courseactivities
+- sink:int__mitxresidential__user_courseactivities_daily
+- sink:int__mitxresidential__user_courseactivity_discussion
+- sink:int__mitxresidential__user_courseactivity_problemcheck
+- sink:int__mitxresidential__user_courseactivity_problemsubmitted
+- sink:int__mitxresidential__user_courseactivity_showanswer
+- sink:int__mitxresidential__user_courseactivity_video
+- sink:int__mitxresidential__users
+- sink:int__ocw__course_departments
+- sink:int__ocw__course_instructors
+- sink:int__ocw__course_topics
+- sink:int__ocw__courses
+- sink:int__ocw__resources
+- sink:int__ovs__videos
+- sink:int__salesforce__opportunity
+- sink:int__salesforce__opportunitylineitem
+- sink:int__zendesk__ticket
+- sink:int__zendesk__ticket_comment
+- sink:interesting_tags
+- sink:irx__mitx__openedx__mysql__auth_user
+- sink:irx__mitx__openedx__mysql__courseware_studentmodulehistoryextended
+- sink:irx__mitx__openedx__mysql__grades_persistentcoursegrade
+- sink:irx__mitx__openedx__mysql__grades_persistentsubsectiongrade
+- sink:irx__mitx__openedx__mysql__student_courseenrollment
+- sink:irx__mitx__openedx__mysql__teams
+- sink:irx__mitx__openedx__mysql__teams_membership
+- sink:irx__mitx__openedx__mysql__user_id_map
+- sink:irx__mitxonline__openedx__bigquery__email_opt_in
+- sink:irx__mitxonline__openedx__mysql__auth_user
+- sink:irx__mitxonline__openedx__mysql__grades_persistentcoursegrade
+- sink:irx__mitxonline__openedx__mysql__grades_persistentsubsectiongrade
+- sink:irx__mitxonline__openedx__mysql__student_courseenrollment
+- sink:irx__mitxonline__openedx__mysql__teams
+- sink:irx__mitxonline__openedx__mysql__teams_membership
+- sink:irx__mitxonline__openedx__mysql__user_id_map
+- sink:irx__xpro__openedx__mysql__auth_user
+- sink:irx__xpro__openedx__mysql__grades_persistentcoursegrade
+- sink:irx__xpro__openedx__mysql__grades_persistentsubsectiongrade
+- sink:irx__xpro__openedx__mysql__student_courseenrollment
+- sink:irx__xpro__openedx__mysql__teams
+- sink:irx__xpro__openedx__mysql__teams_membership
+- sink:irx__xpro__openedx__mysql__user_id_map
+- sink:is_active
+- sink:is_dedp_program
+- sink:is_edxorg_user
+- sink:is_enrolled
+- sink:is_latest
+- sink:is_live
+- sink:is_micromasters_program
+- sink:is_mitxonline_user
+- sink:is_most_recent_attempt
+- sink:is_on_edxorg
+- sink:is_on_mitxonline
+- sink:is_passing
+- sink:is_published
+- sink:is_self_paced
+- sink:is_staff
+- sink:is_superuser
+- sink:job_title
+- sink:language
+- sink:last_activity_at
+- sink:last_attempt_timestamp
+- sink:last_course_start_datetime
+- sink:last_login
+- sink:last_name
+- sink:last_view_timestamp
+- sink:latest_activity_timestamp
+- sink:latest_income_usd
+- sink:latest_original_currency
+- sink:latest_original_income
+- sink:learn_ai_checkpoint_pk
+- sink:learn_ai_thread_id
+- sink:learner_demographics_and_cert_info
+- sink:learner_engagement_report
+- sink:learner_highest_grade
+- sink:learner_lowest_grade
+- sink:learning_resource_types
+- sink:learningresourcetopic_id
+- sink:learningresourcetopic_name
+- sink:learningresourcetopic_parent_id
+- sink:learningresourcetopic_uuid
+- sink:letter_grade
+- sink:line_created_on
+- sink:line_description
+- sink:line_id
+- sink:line_price
+- sink:line_updated_on
+- sink:linerunselection_created_on
+- sink:linerunselection_id
+- sink:linerunselection_updated_on
+- sink:link
+- sink:list_price
+- sink:markdown
+- sink:marts__combined__orders
+- sink:marts__combined__products
+- sink:marts__combined__users
+- sink:marts__combined_course_engagements
+- sink:marts__combined_course_enrollment_detail
+- sink:marts__combined_coursesinprogram
+- sink:marts__combined_discounts
+- sink:marts__combined_problem_submissions
+- sink:marts__combined_program_enrollment_detail
+- sink:marts__combined_total_course_engagements
+- sink:marts__combined_video_engagements
+- sink:marts__micromasters_course_certificates
+- sink:marts__micromasters_dedp_exam_grades
+- sink:marts__micromasters_program_certificates
+- sink:marts__micromasters_summary
+- sink:marts__micromasters_summary_timeseries
+- sink:marts__mitxonline_course_certificates
+- sink:marts__mitxonline_course_engagements_daily
+- sink:marts__mitxonline_course_enrollments
+- sink:marts__mitxonline_discussions
+- sink:marts__mitxonline_problem_submissions
+- sink:marts__mitxonline_problem_summary
+- sink:marts__mitxonline_user_profiles
+- sink:marts__mitxonline_video_engagements
+- sink:marts__mitxpro_all_coupons
+- sink:marts__mitxpro_ecommerce_productlist
+- sink:marts__ocw_courses
+- sink:max_attempts
+- sink:max_coursestructure_block_index
+- sink:max_grade
+- sink:max_learner_grade
+- sink:max_possible_grade
+- sink:max_video_index
+- sink:message_index
+- sink:metadata
+- sink:metadata_body
+- sink:metadata_course_term
+- sink:metadata_course_title
+- sink:metadata_course_year
+- sink:metadata_description
+- sink:metadata_draft
+- sink:metadata_file
+- sink:metadata_file_size
+- sink:metadata_legacy_type
+- sink:metadata_license
+- sink:metadata_resource_type
+- sink:metadata_title
+- sink:metadata_uid
+- sink:micromasters_course_id
+- sink:micromasters_electiveset_id
+- sink:micromasters_program_id
+- sink:micromasters_user_id
+- sink:min_learner_grade
+- sink:mitlearn_openedx_user_id
+- sink:mitlearn_user_id
+- sink:mitxonline_application_user_id
+- sink:mitxonline_course_engagements_daily_report
+- sink:mitxonline_course_id
+- sink:mitxonline_openedx_user_id
+- sink:mitxonline_program_id
+- sink:mitxonline_programrequirement_parent_requirement_id
+- sink:mitxonline_programrequirement_requirement_id
+- sink:mitxonline_video_engagements_w_video_counts
+- sink:mitxpro_application_user_id
+- sink:mitxpro_openedx_user_id
+- sink:mode
+- sink:modified
+- sink:module_id
+- sink:module_type
+- sink:name
+- sink:num_attempts
+- sink:num_discount_codes
+- sink:num_discussion_participated
+- sink:num_events
+- sink:num_of_attempts
+- sink:num_of_correct_attempts
+- sink:num_of_course_enrolled
+- sink:num_of_course_passed
+- sink:num_of_page_views
+- sink:num_of_problems_correct
+- sink:num_of_views
+- sink:num_problem_submitted
+- sink:num_showanswer
+- sink:num_video_played
+- sink:number_of_courserun_certificates
+- sink:number_of_entitlements
+- sink:number_of_problems
+- sink:number_of_redeemed_entitlements
+- sink:number_of_total_attempts
+- sink:offered_by
+- sink:openedx_user_id
+- sink:openedxuser_created_on
+- sink:openedxuser_desired_username
+- sink:openedxuser_has_been_synced
+- sink:openedxuser_id
+- sink:openedxuser_platform
+- sink:openedxuser_updated_on
+- sink:openedxuser_username
+- sink:opportunity_agreement_type
+- sink:opportunity_amount
+- sink:opportunity_business_type
+- sink:opportunity_close_date
+- sink:opportunity_created_on
+- sink:opportunity_data_quality_description
+- sink:opportunity_data_quality_score
+- sink:opportunity_has_lineitem
+- sink:opportunity_id
+- sink:opportunity_is_closed
+- sink:opportunity_is_won
+- sink:opportunity_leadsource
+- sink:opportunity_mit_is_sales_lead
+- sink:opportunity_modified_on
+- sink:opportunity_name
+- sink:opportunity_nextstep
+- sink:opportunity_num_enrollment_codes_redeemed
+- sink:opportunity_num_of_seats_purchased
+- sink:opportunity_price_per_seat
+- sink:opportunity_probability
+- sink:opportunity_revenue_share_or_commission_amount
+- sink:opportunity_revenue_share_or_commission_contract
+- sink:opportunity_stage
+- sink:opportunity_type
+- sink:opportunitylineitem_created_on
+- sink:opportunitylineitem_description
+- sink:opportunitylineitem_discount_percent
+- sink:opportunitylineitem_id
+- sink:opportunitylineitem_list_price
+- sink:opportunitylineitem_modified_on
+- sink:opportunitylineitem_product_code
+- sink:opportunitylineitem_product_name
+- sink:opportunitylineitem_quantity
+- sink:opportunitylineitem_sales_price
+- sink:opportunitylineitem_service_date
+- sink:opportunitylineitem_total_price
+- sink:order_created_on
+- sink:order_id
+- sink:order_payment_type
+- sink:order_purchaser_user_id
+- sink:order_reference_number
+- sink:order_state
+- sink:order_tax_amount
+- sink:order_tax_country_code
+- sink:order_tax_rate
+- sink:order_tax_rate_name
+- sink:order_total_price_paid
+- sink:order_total_price_paid_plus_tax
+- sink:order_type
+- sink:order_updated_on
+- sink:orderaudit_acting_user_id
+- sink:orderaudit_created_on
+- sink:orderaudit_data_after
+- sink:orderaudit_data_before
+- sink:orderaudit_id
+- sink:orderaudit_updated_on
+- sink:org_id
+- sink:organization
+- sink:organization_administration_report
+- sink:organization_api_url
+- sink:organization_created_at
+- sink:organization_deleted_at
+- sink:organization_description
+- sink:organization_domain_names
+- sink:organization_has_shared_comments
+- sink:organization_has_shared_tickets
+- sink:organization_id
+- sink:organization_key
+- sink:organization_logo
+- sink:organization_name
+- sink:organization_notes
+- sink:organization_protected
+- sink:organization_tags
+- sink:organization_updated_at
+- sink:owner_user_id
+- sink:pace
+- sink:page_engagement_views_report
+- sink:page_url
+- sink:page_viewed_title
+- sink:parent_block_id
+- sink:parent_checkpoint_id
+- sink:passed_timestamp
+- sink:password
+- sink:payment_authorization_code
+- sink:payment_bill_to_address_country
+- sink:payment_bill_to_address_state
+- sink:payment_method
+- sink:payment_req_reference_number
+- sink:payment_transaction
+- sink:payment_transaction_id
+- sink:percent_grade
+- sink:percent_problems_attempted
+- sink:percent_problems_correct
+- sink:percolatequery_created_on
+- sink:percolatequery_display_label
+- sink:percolatequery_id
+- sink:percolatequery_original_query
+- sink:percolatequery_query
+- sink:percolatequery_source_type
+- sink:percolatequery_updated_on
+- sink:percolatequery_users_id
+- sink:personal_price
+- sink:personalprice
+- sink:personalprice_id
+- sink:platform
+- sink:platform_description
+- sink:platform_domain
+- sink:platform_fk
+- sink:platform_id
+- sink:platform_name
+- sink:platform_pk
+- sink:platform_readable_id
+- sink:platforms
+- sink:position_in_program
+- sink:possible_all
+- sink:possible_graded
+- sink:post_commented
+- sink:post_content
+- sink:post_created
+- sink:post_id
+- sink:post_replied
+- sink:post_title
+- sink:post_viewed
+- sink:post_voted
+- sink:posts_created
+- sink:posts_replied
+- sink:price
+- sink:primary_course_number
+- sink:problem_block_fk
+- sink:problem_block_id
+- sink:problem_block_index
+- sink:problem_block_pk
+- sink:problem_engagement_detail_report
+- sink:problem_grade
+- sink:problem_id
+- sink:problem_max_grade
+- sink:problem_name
+- sink:problem_submission_timestamp
+- sink:problem_success
+- sink:problem_title
+- sink:problem_types
+- sink:problems_attempted
+- sink:problems_correct
+- sink:problems_count
+- sink:problems_user_submitted
+- sink:proctoredexamgrade_created_on
+- sink:proctoredexamgrade_exam_on
+- sink:proctoredexamgrade_grade
+- sink:proctoredexamgrade_id
+- sink:proctoredexamgrade_is_passing
+- sink:proctoredexamgrade_letter_grade
+- sink:proctoredexamgrade_passing_grade
+- sink:proctoredexamgrade_passing_score
+- sink:proctoredexamgrade_percentage_grade
+- sink:proctoredexamgrade_score
+- sink:proctoredexamgrade_updated_on
+- sink:product_created_on
+- sink:product_description
+- sink:product_id
+- sink:product_is_active
+- sink:product_is_private
+- sink:product_list_price
+- sink:product_name
+- sink:product_object_id
+- sink:product_parent_run_id
+- sink:product_platform
+- sink:product_price
+- sink:product_readable_id
+- sink:product_type
+- sink:product_updated_on
+- sink:product_version_id
+- sink:productcouponassignment_created_on
+- sink:productcouponassignment_email
+- sink:productcouponassignment_id
+- sink:productcouponassignment_is_redeemed
+- sink:productcouponassignment_message_status
+- sink:productcouponassignment_message_status_updated_on
+- sink:productcouponassignment_original_email
+- sink:productcouponassignment_updated_on
+- sink:productversion_created_on
+- sink:productversion_description
+- sink:productversion_id
+- sink:productversion_price
+- sink:productversion_readable_id
+- sink:productversion_requires_enrollment_code
+- sink:productversion_updated_on
+- sink:profile_id
+- sink:profile_updated_on
+- sink:profiletopicinterests_id
+- sink:program_about
+- sink:program_availability
+- sink:program_certificate_awarded_on
+- sink:program_certificate_hashed_id
+- sink:program_certificates
+- sink:program_certification_type
+- sink:program_code
+- sink:program_complete_days
+- sink:program_completion_days
+- sink:program_completion_timestamp
+- sink:program_created_on
+- sink:program_description
+- sink:program_effort
+- sink:program_enrollment_with_user_report
+- sink:program_faq_url
+- sink:program_ga_tracking_id
+- sink:program_id
+- sink:program_instructors
+- sink:program_is_dedp
+- sink:program_is_external
+- sink:program_is_financial_aid_available
+- sink:program_is_live
+- sink:program_is_micromasters
+- sink:program_length
+- sink:program_name
+- sink:program_num_required_courses
+- sink:program_organization
+- sink:program_page_first_published_on
+- sink:program_page_is_live
+- sink:program_page_last_published_on
+- sink:program_page_slug
+- sink:program_page_url_path
+- sink:program_prerequisites
+- sink:program_price
+- sink:program_readable_id
+- sink:program_status
+- sink:program_subtitle
+- sink:program_summary_report
+- sink:program_title
+- sink:program_topics
+- sink:program_track
+- sink:program_type
+- sink:program_updated_on
+- sink:program_uuid
+- sink:program_video_url
+- sink:program_what_you_learn
+- sink:programcertificate_created_on
+- sink:programcertificate_hash
+- sink:programcertificate_id
+- sink:programcertificate_is_revoked
+- sink:programcertificate_updated_on
+- sink:programcertificate_url
+- sink:programcertificate_uuid
+- sink:programenrollment_created_on
+- sink:programenrollment_enrollment_mode
+- sink:programenrollment_enrollment_status
+- sink:programenrollment_id
+- sink:programenrollment_is_active
+- sink:programenrollment_updated_on
+- sink:programrequirement_depth
+- sink:programrequirement_id
+- sink:programrequirement_is_a_nested_requirement
+- sink:programrequirement_node_type
+- sink:programrequirement_numchild
+- sink:programrequirement_operator
+- sink:programrequirement_operator_value
+- sink:programrequirement_parent_requirement_id
+- sink:programrequirement_path
+- sink:programrequirement_requirement_id
+- sink:programrequirement_title
+- sink:programrequirement_type
+- sink:programrun_created_on
+- sink:programrun_end_on
+- sink:programrun_id
+- sink:programrun_readable_id
+- sink:programrun_start_on
+- sink:programrun_tag
+- sink:programrun_updated_on
+- sink:programrunline_created_on
+- sink:programrunline_id
+- sink:programrunline_updated_on
+- sink:purchase_date
+- sink:rating
+- sink:rating_created_on
+- sink:rating_reason
+- sink:rating_updated_on
+- sink:receipt_authorization_code
+- sink:receipt_bill_to_address_country
+- sink:receipt_bill_to_address_state
+- sink:receipt_created_on
+- sink:receipt_data
+- sink:receipt_id
+- sink:receipt_payer_email
+- sink:receipt_payer_ip_address
+- sink:receipt_payer_name
+- sink:receipt_payment_amount
+- sink:receipt_payment_card_number
+- sink:receipt_payment_card_type
+- sink:receipt_payment_currency
+- sink:receipt_payment_method
+- sink:receipt_payment_timestamp
+- sink:receipt_payment_transaction_type
+- sink:receipt_payment_transaction_uuid
+- sink:receipt_reference_number
+- sink:receipt_transaction_id
+- sink:receipt_transaction_status
+- sink:receipt_transaction_type
+- sink:receipt_transaction_uuid
+- sink:receipt_updated_on
+- sink:receipt_url
+- sink:redeemed
+- sink:redeemed_email
+- sink:redeemedcoupon_created_on
+- sink:redeemedcoupon_id
+- sink:redeemedcoupon_updated_on
+- sink:req_reference_number
+- sink:residential_openedx_user_id
+- sink:resource_draft
+- sink:resource_filename
+- sink:resource_id
+- sink:resource_live_url
+- sink:resource_title
+- sink:resource_type
+- sink:resource_uuid
+- sink:response_voted
+- sink:retrieved_at
+- sink:revision_comment
+- sink:revision_date_created
+- sink:revision_id
+- sink:rewatch_indicator
+- sink:risk_probability
+- sink:run_tag
+- sink:salesforce_opportunity_id
+- sink:section_block_index
+- sink:section_content_fk
+- sink:section_title
+- sink:self_paced
+- sink:semester
+- sink:sequential_block_fk
+- sink:sequential_block_id
+- sink:sequential_name
+- sink:session_id
+- sink:share_hash
+- sink:sharing_agreement_ids
+- sink:short_program_code
+- sink:show_country
+- sink:signatory_certificate_id
+- sink:signatory_id
+- sink:signatory_name
+- sink:signatory_names
+- sink:signatory_normalized_name
+- sink:signatory_organization
+- sink:signatory_title
+- sink:signatorypage_name
+- sink:signatorypage_organization
+- sink:signatorypage_title_1
+- sink:signatorypage_title_2
+- sink:signatorypage_title_3
+- sink:signature_image_url
+- sink:sso_organization_id
+- sink:start_date
+- sink:starting_position
+- sink:state_data
+- sink:status
+- sink:stg__bootcamps__app__postgres__applications_applicationstep
+- sink:stg__bootcamps__app__postgres__applications_applicationstep_submission
+- sink:stg__bootcamps__app__postgres__applications_courserun_application
+- sink:stg__bootcamps__app__postgres__applications_courserun_applicationstep
+- sink:stg__bootcamps__app__postgres__auth_user
+- sink:stg__bootcamps__app__postgres__courserunenrollment
+- sink:stg__bootcamps__app__postgres__courses_course
+- sink:stg__bootcamps__app__postgres__courses_courserun
+- sink:stg__bootcamps__app__postgres__courses_courseruncertificate
+- sink:stg__bootcamps__app__postgres__courses_installment
+- sink:stg__bootcamps__app__postgres__courses_personalprice
+- sink:stg__bootcamps__app__postgres__django_contenttype
+- sink:stg__bootcamps__app__postgres__ecommerce_line
+- sink:stg__bootcamps__app__postgres__ecommerce_order
+- sink:stg__bootcamps__app__postgres__ecommerce_orderaudit
+- sink:stg__bootcamps__app__postgres__ecommerce_receipt
+- sink:stg__bootcamps__app__postgres__ecommerce_wiretransferreceipt
+- sink:stg__bootcamps__app__postgres__profiles_legaladdress
+- sink:stg__bootcamps__app__postgres__profiles_profile
+- sink:stg__edxorg__api__course
+- sink:stg__edxorg__api__courserun
+- sink:stg__edxorg__bigquery__mitx_courserun
+- sink:stg__edxorg__bigquery__mitx_person_course
+- sink:stg__edxorg__bigquery__mitx_user_email_opt_in
+- sink:stg__edxorg__bigquery__mitx_user_info_combo
+- sink:stg__edxorg__program_entitlement
+- sink:stg__edxorg__s3__course_certificate_signatory
+- sink:stg__edxorg__s3__course_policy
+- sink:stg__edxorg__s3__course_structure
+- sink:stg__edxorg__s3__course_video
+- sink:stg__edxorg__s3__courserun
+- sink:stg__edxorg__s3__courserun_certificate
+- sink:stg__edxorg__s3__courserun_enrollment
+- sink:stg__edxorg__s3__courserun_grade
+- sink:stg__edxorg__s3__courseware_studentmodule
+- sink:stg__edxorg__s3__program_courses
+- sink:stg__edxorg__s3__program_learner_report
+- sink:stg__edxorg__s3__programs
+- sink:stg__edxorg__s3__tracking_logs__user_activity
+- sink:stg__edxorg__s3__user
+- sink:stg__edxorg__s3__user_courseaccessrole
+- sink:stg__edxorg__s3__user_profile
+- sink:stg__emeritus__api__bigquery__user_enrollments
+- sink:stg__global_alumni__api__bigquery__user_enrollments
+- sink:stg__learn_ai__app__postgres__chatbots_chatresponserating
+- sink:stg__learn_ai__app__postgres__chatbots_djangocheckpoint
+- sink:stg__learn_ai__app__postgres__chatbots_tutorbotoutput
+- sink:stg__learn_ai__app__postgres__chatbots_userchatsession
+- sink:stg__learn_ai__app__postgres__users_user
+- sink:stg__micromasters__app__postgres__auth_user
+- sink:stg__micromasters__app__postgres__auth_usersocialauth
+- sink:stg__micromasters__app__postgres__courses_course
+- sink:stg__micromasters__app__postgres__courses_courserun
+- sink:stg__micromasters__app__postgres__courses_electiveset
+- sink:stg__micromasters__app__postgres__courses_electiveset_to_course
+- sink:stg__micromasters__app__postgres__courses_program
+- sink:stg__micromasters__app__postgres__dashboard_programenrollment
+- sink:stg__micromasters__app__postgres__django_contenttype
+- sink:stg__micromasters__app__postgres__ecommerce_coupon
+- sink:stg__micromasters__app__postgres__ecommerce_couponinvoice
+- sink:stg__micromasters__app__postgres__ecommerce_line
+- sink:stg__micromasters__app__postgres__ecommerce_order
+- sink:stg__micromasters__app__postgres__ecommerce_receipt
+- sink:stg__micromasters__app__postgres__ecommerce_redeemedcoupon
+- sink:stg__micromasters__app__postgres__ecommerce_usercoupon
+- sink:stg__micromasters__app__postgres__exams_examrun
+- sink:stg__micromasters__app__postgres__grades_combinedcoursegrade
+- sink:stg__micromasters__app__postgres__grades_coursecertificate
+- sink:stg__micromasters__app__postgres__grades_courserungrade
+- sink:stg__micromasters__app__postgres__grades_proctoredexamgrade
+- sink:stg__micromasters__app__postgres__grades_programcertificate
+- sink:stg__micromasters__app__postgres__profiles_education
+- sink:stg__micromasters__app__postgres__profiles_employment
+- sink:stg__micromasters__app__postgres__profiles_profile
+- sink:stg__micromasters__app__user_program_certificate_override_list
+- sink:stg__mitlearn__app__postgres__learning_resources_learningresourcetopic
+- sink:stg__mitlearn__app__postgres__learning_resources_search_percolatequery
+- sink:stg__mitlearn__app__postgres__learning_resources_search_percolatequery_users
+- sink:stg__mitlearn__app__postgres__learning_resources_userlist
+- sink:stg__mitlearn__app__postgres__learning_resources_userlist_topics
+- sink:stg__mitlearn__app__postgres__learning_resources_userlistrelationship
+- sink:stg__mitlearn__app__postgres__profiles_profile
+- sink:stg__mitlearn__app__postgres__profiles_profile_topic_interests
+- sink:stg__mitlearn__app__postgres__users_user
+- sink:stg__mitxonline__app__postgres__b2b_contractpage
+- sink:stg__mitxonline__app__postgres__b2b_organizationpage
+- sink:stg__mitxonline__app__postgres__cms_coursepage
+- sink:stg__mitxonline__app__postgres__cms_coursepage_topics
+- sink:stg__mitxonline__app__postgres__cms_instructorpage
+- sink:stg__mitxonline__app__postgres__cms_instructorpagelink
+- sink:stg__mitxonline__app__postgres__cms_programpage
+- sink:stg__mitxonline__app__postgres__cms_signatorypage
+- sink:stg__mitxonline__app__postgres__cms_wagtail_page
+- sink:stg__mitxonline__app__postgres__cms_wagtailcore_revision
+- sink:stg__mitxonline__app__postgres__courses_blockedcountry
+- sink:stg__mitxonline__app__postgres__courses_course
+- sink:stg__mitxonline__app__postgres__courses_course_to_department
+- sink:stg__mitxonline__app__postgres__courses_courserun
+- sink:stg__mitxonline__app__postgres__courses_courseruncertificate
+- sink:stg__mitxonline__app__postgres__courses_courserunenrollment
+- sink:stg__mitxonline__app__postgres__courses_courserungrade
+- sink:stg__mitxonline__app__postgres__courses_coursetopic
+- sink:stg__mitxonline__app__postgres__courses_department
+- sink:stg__mitxonline__app__postgres__courses_program
+- sink:stg__mitxonline__app__postgres__courses_programcertificate
+- sink:stg__mitxonline__app__postgres__courses_programenrollment
+- sink:stg__mitxonline__app__postgres__courses_programrequirement
+- sink:stg__mitxonline__app__postgres__courses_programrun
+- sink:stg__mitxonline__app__postgres__django_contenttype
+- sink:stg__mitxonline__app__postgres__ecommerce_basket
+- sink:stg__mitxonline__app__postgres__ecommerce_basketdiscount
+- sink:stg__mitxonline__app__postgres__ecommerce_basketitem
+- sink:stg__mitxonline__app__postgres__ecommerce_discount
+- sink:stg__mitxonline__app__postgres__ecommerce_discountproduct
+- sink:stg__mitxonline__app__postgres__ecommerce_discountredemption
+- sink:stg__mitxonline__app__postgres__ecommerce_line
+- sink:stg__mitxonline__app__postgres__ecommerce_order
+- sink:stg__mitxonline__app__postgres__ecommerce_product
+- sink:stg__mitxonline__app__postgres__ecommerce_transaction
+- sink:stg__mitxonline__app__postgres__ecommerce_userdiscount
+- sink:stg__mitxonline__app__postgres__flexiblepricing_countryincomethreshold
+- sink:stg__mitxonline__app__postgres__flexiblepricing_currencyexchangerate
+- sink:stg__mitxonline__app__postgres__flexiblepricing_flexiblepriceapplication
+- sink:stg__mitxonline__app__postgres__flexiblepricing_flexiblepricetier
+- sink:stg__mitxonline__app__postgres__openedx_openedxuser
+- sink:stg__mitxonline__app__postgres__reversion_revision
+- sink:stg__mitxonline__app__postgres__reversion_version
+- sink:stg__mitxonline__app__postgres__users_legaladdress
+- sink:stg__mitxonline__app__postgres__users_user
+- sink:stg__mitxonline__app__postgres__users_userprofile
+- sink:stg__mitxonline__openedx__api__course_structure
+- sink:stg__mitxonline__openedx__blockcompletion
+- sink:stg__mitxonline__openedx__courseware_studentmodulehistoryextended
+- sink:stg__mitxonline__openedx__mysql__auth_user
+- sink:stg__mitxonline__openedx__mysql__bulk_email_optout
+- sink:stg__mitxonline__openedx__mysql__courseware_studentmodule
+- sink:stg__mitxonline__openedx__mysql__edxval_coursevideo
+- sink:stg__mitxonline__openedx__mysql__edxval_video
+- sink:stg__mitxonline__openedx__mysql__grades_subsectiongrade
+- sink:stg__mitxonline__openedx__mysql__grades_subsectiongradeoverride
+- sink:stg__mitxonline__openedx__mysql__grades_visibleblocks
+- sink:stg__mitxonline__openedx__mysql__user_courseaccessrole
+- sink:stg__mitxonline__openedx__tracking_logs__user_activity
+- sink:stg__mitxpro__app__postgres__b2becommerce_b2bcoupon
+- sink:stg__mitxpro__app__postgres__b2becommerce_b2bcouponaudit
+- sink:stg__mitxpro__app__postgres__b2becommerce_b2bcouponredemption
+- sink:stg__mitxpro__app__postgres__b2becommerce_b2border
+- sink:stg__mitxpro__app__postgres__b2becommerce_b2borderaudit
+- sink:stg__mitxpro__app__postgres__b2becommerce_b2breceipt
+- sink:stg__mitxpro__app__postgres__cms_certificatepage
+- sink:stg__mitxpro__app__postgres__cms_coursepage
+- sink:stg__mitxpro__app__postgres__cms_coursepage_topics
+- sink:stg__mitxpro__app__postgres__cms_coursesinprogrampage
+- sink:stg__mitxpro__app__postgres__cms_facultymemberspage
+- sink:stg__mitxpro__app__postgres__cms_programpage
+- sink:stg__mitxpro__app__postgres__cms_signatorypage
+- sink:stg__mitxpro__app__postgres__courses_course
+- sink:stg__mitxpro__app__postgres__courses_courserun
+- sink:stg__mitxpro__app__postgres__courses_courseruncertificate
+- sink:stg__mitxpro__app__postgres__courses_courserunenrollment
+- sink:stg__mitxpro__app__postgres__courses_courserungrade
+- sink:stg__mitxpro__app__postgres__courses_coursetopic
+- sink:stg__mitxpro__app__postgres__courses_platform
+- sink:stg__mitxpro__app__postgres__courses_program
+- sink:stg__mitxpro__app__postgres__courses_programcertificate
+- sink:stg__mitxpro__app__postgres__courses_programenrollment
+- sink:stg__mitxpro__app__postgres__courses_programrun
+- sink:stg__mitxpro__app__postgres__django_contenttype
+- sink:stg__mitxpro__app__postgres__ecommerce_basket
+- sink:stg__mitxpro__app__postgres__ecommerce_basketitem
+- sink:stg__mitxpro__app__postgres__ecommerce_basketrunselection
+- sink:stg__mitxpro__app__postgres__ecommerce_bulkcouponassignment
+- sink:stg__mitxpro__app__postgres__ecommerce_company
+- sink:stg__mitxpro__app__postgres__ecommerce_coupon
+- sink:stg__mitxpro__app__postgres__ecommerce_couponbasket
+- sink:stg__mitxpro__app__postgres__ecommerce_couponpayment
+- sink:stg__mitxpro__app__postgres__ecommerce_couponpaymentversion
+- sink:stg__mitxpro__app__postgres__ecommerce_couponproduct
+- sink:stg__mitxpro__app__postgres__ecommerce_couponredemption
+- sink:stg__mitxpro__app__postgres__ecommerce_couponversion
+- sink:stg__mitxpro__app__postgres__ecommerce_line
+- sink:stg__mitxpro__app__postgres__ecommerce_linerunselection
+- sink:stg__mitxpro__app__postgres__ecommerce_order
+- sink:stg__mitxpro__app__postgres__ecommerce_orderaudit
+- sink:stg__mitxpro__app__postgres__ecommerce_product
+- sink:stg__mitxpro__app__postgres__ecommerce_productcouponassignment
+- sink:stg__mitxpro__app__postgres__ecommerce_productversion
+- sink:stg__mitxpro__app__postgres__ecommerce_programrunline
+- sink:stg__mitxpro__app__postgres__ecommerce_receipt
+- sink:stg__mitxpro__app__postgres__users_legaladdress
+- sink:stg__mitxpro__app__postgres__users_profile
+- sink:stg__mitxpro__app__postgres__users_user
+- sink:stg__mitxpro__app__postgres__wagtail_page
+- sink:stg__mitxpro__openedx__api__course_structure
+- sink:stg__mitxpro__openedx__blockcompletion
+- sink:stg__mitxpro__openedx__courseware_studentmodulehistoryextended
+- sink:stg__mitxpro__openedx__mysql__auth_user
+- sink:stg__mitxpro__openedx__mysql__courserun_enrollment
+- sink:stg__mitxpro__openedx__mysql__courseware_studentmodule
+- sink:stg__mitxpro__openedx__mysql__edxval_coursevideo
+- sink:stg__mitxpro__openedx__mysql__edxval_video
+- sink:stg__mitxpro__openedx__mysql__user_courseaccessrole
+- sink:stg__mitxpro__openedx__tracking_logs__user_activity
+- sink:stg__mitxresidential__openedx__api__course_structure
+- sink:stg__mitxresidential__openedx__auth_user
+- sink:stg__mitxresidential__openedx__auth_userprofile
+- sink:stg__mitxresidential__openedx__blockcompletion
+- sink:stg__mitxresidential__openedx__courserun
+- sink:stg__mitxresidential__openedx__courserun_enrollment
+- sink:stg__mitxresidential__openedx__courserun_grade
+- sink:stg__mitxresidential__openedx__courseware_studentmodule
+- sink:stg__mitxresidential__openedx__courseware_studentmodulehistoryextended
+- sink:stg__mitxresidential__openedx__edxval_coursevideo
+- sink:stg__mitxresidential__openedx__edxval_video
+- sink:stg__mitxresidential__openedx__tracking_logs__user_activity
+- sink:stg__mitxresidential__openedx__user_courseaccessrole
+- sink:stg__ocw__studio__postgres__websites_website
+- sink:stg__ocw__studio__postgres__websites_websitecontent
+- sink:stg__ocw__studio__postgres__websites_websitestarter
+- sink:stg__ovs__studio__postgres__ui_collection
+- sink:stg__ovs__studio__postgres__ui_collectionedxendpoint
+- sink:stg__ovs__studio__postgres__ui_edxendpoint
+- sink:stg__ovs__studio__postgres__ui_encodejob
+- sink:stg__ovs__studio__postgres__ui_video
+- sink:stg__salesforce__opportunity
+- sink:stg__salesforce__opportunitylineitem
+- sink:stg__zendesk__brand
+- sink:stg__zendesk__group
+- sink:stg__zendesk__organization
+- sink:stg__zendesk__ticket
+- sink:stg__zendesk__ticket_comment
+- sink:stg__zendesk__ticket_field
+- sink:stg__zendesk__user
+- sink:student_answers
+- sink:student_risk_probability_report
+- sink:studentmodule_created_on
+- sink:studentmodule_id
+- sink:studentmodule_problem_grade
+- sink:studentmodule_problem_max_grade
+- sink:studentmodule_state_data
+- sink:studentmodule_updated_on
+- sink:studentmodulehistoryextended_id
+- sink:submission_created_on
+- sink:submission_id
+- sink:submission_object_id
+- sink:submission_review_status
+- sink:submission_reviewed_on
+- sink:submission_status
+- sink:submission_submitted_on
+- sink:submission_updated_on
+- sink:subsection_block_index
+- sink:subsection_content_fk
+- sink:subsection_title
+- sink:subsectiongrade_created_on
+- sink:subsectiongrade_first_attempted_on
+- sink:subsectiongrade_id
+- sink:subsectiongrade_is_overridden
+- sink:subsectiongrade_total_earned_graded_score
+- sink:subsectiongrade_total_earned_score
+- sink:subsectiongrade_total_graded_score
+- sink:subsectiongrade_total_score
+- sink:subsectiongrade_updated_on
+- sink:subsectiongradeoverride_created_on
+- sink:subsectiongradeoverride_id
+- sink:subsectiongradeoverride_reason
+- sink:subsectiongradeoverride_system
+- sink:subsectiongradeoverride_total_earned_graded_score
+- sink:subsectiongradeoverride_total_earned_score
+- sink:subsectiongradeoverride_total_graded_score
+- sink:subsectiongradeoverride_total_score
+- sink:subsectiongradeoverride_updated_on
+- sink:success
+- sink:team_id
+- sink:team_size
+- sink:tfact_chatbot_events
+- sink:tfact_course_navigation_events
+- sink:tfact_discussion_events
+- sink:tfact_problem_events
+- sink:tfact_studentmodule_problems
+- sink:tfact_video_events
+- sink:thread_id
+- sink:ticket_allow_attachments
+- sink:ticket_allow_channelback
+- sink:ticket_api_url
+- sink:ticket_assignee
+- sink:ticket_assignee_user_id
+- sink:ticket_collaborator_user_ids
+- sink:ticket_collaborators
+- sink:ticket_created_at
+- sink:ticket_custom_fields
+- sink:ticket_description
+- sink:ticket_due_at
+- sink:ticket_email_cc_user_ids
+- sink:ticket_follower_user_ids
+- sink:ticket_followers
+- sink:ticket_form_id
+- sink:ticket_has_incidents
+- sink:ticket_id
+- sink:ticket_is_from_messaging_channel
+- sink:ticket_is_public
+- sink:ticket_priority
+- sink:ticket_raw_subject
+- sink:ticket_recipient_email
+- sink:ticket_requester
+- sink:ticket_requester_user_id
+- sink:ticket_satisfaction_rating_comment
+- sink:ticket_satisfaction_rating_object
+- sink:ticket_satisfaction_rating_reason
+- sink:ticket_satisfaction_rating_score
+- sink:ticket_source_channel
+- sink:ticket_source_email
+- sink:ticket_source_rel
+- sink:ticket_source_ticket_id
+- sink:ticket_status
+- sink:ticket_subject
+- sink:ticket_submitter
+- sink:ticket_submitter_user_id
+- sink:ticket_tags
+- sink:ticket_type
+- sink:ticket_unix_timestamp
+- sink:ticket_updated_at
+- sink:ticket_via_object
+- sink:time_commitment
+- sink:time_spent_on_problem
+- sink:time_spent_on_problem_nolimit
+- sink:topic_id
+- sink:topic_interests
+- sink:topic_name
+- sink:topics
+- sink:total_amount_paid_orders
+- sink:total_courserun_discussions
+- sink:total_courserun_problems
+- sink:total_courserun_videos
+- sink:total_enrollments
+- sink:total_paid
+- sink:total_video_count
+- sink:transaction_amount
+- sink:transaction_authorization_code
+- sink:transaction_bill_to_address_country
+- sink:transaction_bill_to_address_state
+- sink:transaction_created_on
+- sink:transaction_data
+- sink:transaction_id
+- sink:transaction_payer_email
+- sink:transaction_payer_ip_address
+- sink:transaction_payer_name
+- sink:transaction_payment_amount
+- sink:transaction_payment_card_number
+- sink:transaction_payment_card_type
+- sink:transaction_payment_currency
+- sink:transaction_payment_method
+- sink:transaction_readable_identifier
+- sink:transaction_req_type
+- sink:transaction_status
+- sink:transaction_timestamp
+- sink:transaction_type
+- sink:transaction_updated_on
+- sink:transaction_uuid
+- sink:transcripts
+- sink:tutorbot_chat_json
+- sink:tutorbotoutput_id
+- sink:unenrolled_count
+- sink:unique_countries
+- sink:unique_course_certificate_earners
+- sink:unique_courses_taken_in_program
+- sink:unique_users
+- sink:unique_verified_users
+- sink:unit_content_fk
+- sink:unit_name
+- sink:unit_price
+- sink:unit_title
+- sink:upgrade_deadline
+- sink:usage_key
+- sink:user_about_me
+- sink:user_account_privacy
+- sink:user_address_city
+- sink:user_address_country
+- sink:user_address_id
+- sink:user_address_postal_code
+- sink:user_address_state
+- sink:user_address_state_or_territory
+- sink:user_address_street
+- sink:user_alias
+- sink:user_api_url
+- sink:user_auth_id
+- sink:user_auth_provider
+- sink:user_avg_exam_grade
+- sink:user_avg_hw_grade
+- sink:user_bio
+- sink:user_birth_country
+- sink:user_birth_date
+- sink:user_birth_year
+- sink:user_bootcamps_id
+- sink:user_bootcamps_username
+- sink:user_certificate_desired
+- sink:user_city
+- sink:user_company
+- sink:user_company_city
+- sink:user_company_country
+- sink:user_company_industry
+- sink:user_company_name
+- sink:user_company_size
+- sink:user_company_state
+- sink:user_completed_onboarding
+- sink:user_country
+- sink:user_country_code
+- sink:user_created_at
+- sink:user_created_on
+- sink:user_current_education
+- sink:user_default_group_id
+- sink:user_delivery_preference
+- sink:user_details
+- sink:user_discussion_count
+- sink:user_education_degree
+- sink:user_education_id
+- sink:user_education_is_online_degree
+- sink:user_edx_goals
+- sink:user_edx_name
+- sink:user_edxorg_email
+- sink:user_edxorg_id
+- sink:user_edxorg_username
+- sink:user_email
+- sink:user_email_is_optin
+- sink:user_email_opt_in_updated_on
+- sink:user_email_optin
+- sink:user_employer
+- sink:user_employment_id
+- sink:user_end_date
+- sink:user_exam_median_solving_time
+- sink:user_exam_time_flags
+- sink:user_field_of_study
+- sink:user_fields
+- sink:user_first_name
+- sink:user_fk
+- sink:user_full_name
+- sink:user_gdpr_consent_date
+- sink:user_gdpr_degree
+- sink:user_gender
+- sink:user_global_id
+- sink:user_goals
+- sink:user_graduation_date
+- sink:user_has_agreed_to_terms_of_service
+- sink:user_has_completed_course
+- sink:user_has_completed_program
+- sink:user_has_purchased_as_bundle
+- sink:user_has_two_factor_auth_enabled
+- sink:user_hashed_id
+- sink:user_headline
+- sink:user_highest_education
+- sink:user_hw_attempts_on_problem
+- sink:user_hw_median_solving_time
+- sink:user_iana_time_zone
+- sink:user_id
+- sink:user_image_file
+- sink:user_image_medium_file
+- sink:user_image_medium_url
+- sink:user_image_small_file
+- sink:user_image_small_url
+- sink:user_image_url
+- sink:user_industry
+- sink:user_is_active
+- sink:user_is_active_on_edxorg
+- sink:user_is_active_on_mitlearn
+- sink:user_is_active_on_mitxonline
+- sink:user_is_active_on_mitxpro
+- sink:user_is_active_on_residential
+- sink:user_is_chat_only
+- sink:user_is_moderator
+- sink:user_is_opted_in_for_email
+- sink:user_is_permanently_deleted
+- sink:user_is_restricted_agent
+- sink:user_is_shared
+- sink:user_is_shared_agent
+- sink:user_is_staff
+- sink:user_is_superuser
+- sink:user_is_suspended
+- sink:user_is_verified
+- sink:user_job_function
+- sink:user_job_position
+- sink:user_job_title
+- sink:user_joined_on
+- sink:user_joined_on_edxorg
+- sink:user_joined_on_mitlearn
+- sink:user_joined_on_mitxonline
+- sink:user_joined_on_mitxpro
+- sink:user_joined_on_residential
+- sink:user_language_proficiencies
+- sink:user_last_login
+- sink:user_last_login_at
+- sink:user_last_login_on_edxorg
+- sink:user_last_login_on_mitxonline
+- sink:user_last_name
+- sink:user_leadership_level
+- sink:user_locale
+- sink:user_locale_id
+- sink:user_location
+- sink:user_mail_id
+- sink:user_mailing_address
+- sink:user_map_hash_id
+- sink:user_micromasters_email
+- sink:user_micromasters_id
+- sink:user_micromasters_profile_id
+- sink:user_mitxonline_email
+- sink:user_mitxonline_id
+- sink:user_mitxonline_username
+- sink:user_mitxpro_id
+- sink:user_mitxpro_username
+- sink:user_name
+- sink:user_nationality
+- sink:user_non_exam_problem_count
+- sink:user_notes
+- sink:user_only_private_comments
+- sink:user_phone_number
+- sink:user_photo_object
+- sink:user_pk
+- sink:user_preferred_language
+- sink:user_preferred_name
+- sink:user_profile_country
+- sink:user_profile_created_on
+- sink:user_profile_goals
+- sink:user_profile_id
+- sink:user_profile_image
+- sink:user_profile_image_medium
+- sink:user_profile_image_small
+- sink:user_profile_is_fake
+- sink:user_profile_is_filled_out
+- sink:user_profile_meta
+- sink:user_profile_metadata
+- sink:user_profile_parental_consent_is_required
+- sink:user_profile_updated_on
+- sink:user_residential_username
+- sink:user_role
+- sink:user_role_type
+- sink:user_roles
+- sink:user_romanized_full_name
+- sink:user_school_city
+- sink:user_school_country
+- sink:user_school_name
+- sink:user_school_state
+- sink:user_scim_external_id
+- sink:user_scim_id
+- sink:user_scim_username
+- sink:user_signature
+- sink:user_start_date
+- sink:user_street_address
+- sink:user_student_id
+- sink:user_tags
+- sink:user_taken_final_exam
+- sink:user_ticket_restriction
+- sink:user_time_commitment
+- sink:user_time_zone
+- sink:user_toc_optin
+- sink:user_type_is_educator
+- sink:user_type_is_other
+- sink:user_type_is_professional
+- sink:user_type_is_student
+- sink:user_updated_at
+- sink:user_updated_on
+- sink:user_username
+- sink:user_vat_id
+- sink:user_watched_video_count
+- sink:user_year_of_birth
+- sink:user_years_experience
+- sink:useractivity_context_object
+- sink:useractivity_discussion_block_id
+- sink:useractivity_discussion_block_name
+- sink:useractivity_discussion_page_url
+- sink:useractivity_discussion_post_id
+- sink:useractivity_discussion_post_title
+- sink:useractivity_discussion_roles
+- sink:useractivity_discussion_search_query
+- sink:useractivity_event_id
+- sink:useractivity_event_name
+- sink:useractivity_event_object
+- sink:useractivity_event_source
+- sink:useractivity_event_type
+- sink:useractivity_http_accept_language
+- sink:useractivity_http_host
+- sink:useractivity_http_referer
+- sink:useractivity_http_user_agent
+- sink:useractivity_ip
+- sink:useractivity_page_url
+- sink:useractivity_path
+- sink:useractivity_problem_attempts
+- sink:useractivity_problem_current_grade
+- sink:useractivity_problem_earned_score
+- sink:useractivity_problem_id
+- sink:useractivity_problem_max_grade
+- sink:useractivity_problem_max_score
+- sink:useractivity_problem_name
+- sink:useractivity_problem_student_answers
+- sink:useractivity_problem_success
+- sink:useractivity_problem_weight
+- sink:useractivity_session_id
+- sink:useractivity_timestamp
+- sink:useractivity_video_currenttime
+- sink:useractivity_video_duration
+- sink:useractivity_video_id
+- sink:useractivity_video_new_speed
+- sink:useractivity_video_new_time
+- sink:useractivity_video_old_speed
+- sink:useractivity_video_old_time
+- sink:usercoupon_created_on
+- sink:usercoupon_id
+- sink:usercoupon_updated_on
+- sink:userdiscount_created_on
+- sink:userdiscount_id
+- sink:userdiscount_updated_on
+- sink:userlist_author_user_id
+- sink:userlist_created_on
+- sink:userlist_description
+- sink:userlist_id
+- sink:userlist_privacy_level
+- sink:userlist_title
+- sink:userlist_updated_on
+- sink:userlistrelationship_child_id
+- sink:userlistrelationship_created_on
+- sink:userlistrelationship_id
+- sink:userlistrelationship_parent_id
+- sink:userlistrelationship_position
+- sink:userlistrelationship_updated_on
+- sink:userlisttopics_id
+- sink:username
+- sink:verified_count
+- sink:verified_enrollments
+- sink:version_id
+- sink:version_object_id
+- sink:version_object_serialized_data
+- sink:video_archive_url
+- sink:video_block_fk
+- sink:video_block_id
+- sink:video_block_pk
+- sink:video_captions_file
+- sink:video_client_id
+- sink:video_completes
+- sink:video_created_on
+- sink:video_currenttime
+- sink:video_description
+- sink:video_duration
+- sink:video_edx_id
+- sink:video_edx_uuid
+- sink:video_engagement_report
+- sink:video_event_timestamp
+- sink:video_event_type
+- sink:video_id
+- sink:video_index
+- sink:video_is_logged_in_only
+- sink:video_is_multiangle
+- sink:video_is_private
+- sink:video_is_public
+- sink:video_metadata
+- sink:video_name
+- sink:video_new_time
+- sink:video_old_time
+- sink:video_parent_block_id
+- sink:video_played_count
+- sink:video_position
+- sink:video_source_url
+- sink:video_status
+- sink:video_thumbnail_file
+- sink:video_title
+- sink:video_transcript_file
+- sink:video_updated_on
+- sink:video_uuid
+- sink:video_watched_count
+- sink:video_youtube_description
+- sink:video_youtube_id
+- sink:video_youtube_speakers
+- sink:video_youtube_tags
+- sink:videos_user_watched
+- sink:videos_watched
+- sink:visibleblocks_hash
+- sink:visibleblocks_id
+- sink:visibleblocks_json
+- sink:wagtail_page_depth
+- sink:wagtail_page_first_published_on
+- sink:wagtail_page_has_unpublished_changes
+- sink:wagtail_page_id
+- sink:wagtail_page_is_live
+- sink:wagtail_page_last_published_on
+- sink:wagtail_page_latest_revision_created_on
+- sink:wagtail_page_live_pagerevision_id
+- sink:wagtail_page_num_children
+- sink:wagtail_page_path
+- sink:wagtail_page_search_description
+- sink:wagtail_page_seo_title
+- sink:wagtail_page_slug
+- sink:wagtail_page_title
+- sink:wagtail_page_url_path
+- sink:wagtailcore_revision_content
+- sink:wagtailcore_revision_created_on
+- sink:wagtailcore_revision_id
+- sink:wagtailimages_image_id
+- sink:website_created_on
+- sink:website_first_published_on
+- sink:website_has_never_published
+- sink:website_is_live
+- sink:website_is_unpublished
+- sink:website_last_published_by_user_id
+- sink:website_last_unpublished_by_user_id
+- sink:website_live_url
+- sink:website_metadata
+- sink:website_name
+- sink:website_owner_user_id
+- sink:website_publish_date_updated_on
+- sink:website_publish_status
+- sink:website_short_id
+- sink:website_source
+- sink:website_title
+- sink:website_unpublish_status
+- sink:website_updated_on
+- sink:website_url_path
+- sink:website_uuid
+- sink:websitecontent_created_on
+- sink:websitecontent_deleted_on
+- sink:websitecontent_dirpath
+- sink:websitecontent_file
+- sink:websitecontent_filename
+- sink:websitecontent_id
+- sink:websitecontent_is_page
+- sink:websitecontent_metadata
+- sink:websitecontent_owner_user_id
+- sink:websitecontent_parent_id
+- sink:websitecontent_text_id
+- sink:websitecontent_title
+- sink:websitecontent_type
+- sink:websitecontent_updated_by_user_id
+- sink:websitecontent_updated_on
+- sink:websitestarter_created_on
+- sink:websitestarter_id
+- sink:websitestarter_name
+- sink:websitestarter_path
+- sink:websitestarter_slug
+- sink:websitestarter_source
+- sink:websitestarter_status
+- sink:websitestarter_updated_on
+- sink:weight
+- sink:wiretransferreceipt_created_on
+- sink:wiretransferreceipt_data
+- sink:wiretransferreceipt_id
+- sink:wiretransferreceipt_import_id
+- sink:wiretransferreceipt_updated_on
+- Technical Debt:
+Circular dependencies:
+- None detected
+Documentation Drift flags:
+- None detected
+- High-Velocity Core:
+- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\src\ol_dbt\models\reporting\_reporting__models.yml (change_frequency: 21)
+- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\.pre-commit-config.yaml (change_frequency: 10)
+- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\src\ol_dbt\models\migration\edxorg_to_mitxonline_enrollments.sql (change_frequency: 9)
+- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\docker-compose.yaml (change_frequency: 6)
+- C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\dg_projects\edxorg\edxorg\assets\edxorg_archive.py (change_frequency: 6)
+- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\src\ol_superset\assets\metadata.yaml (change_frequency: 6)
+- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\src\ol_superset\assets\databases\Trino.yaml (change_frequency: 6)
+- C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\dg_projects\edxorg\edxorg\assets\openedx_course_archives.py (change_frequency: 5)
+- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\src\ol_superset\.sup\state.yml (change_frequency: 5)
+- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\src\ol_superset\assets\charts\Content_Engagement_-_Weekly_fb5f7dd7-f56e-44f4-97f6-ed0c3804382f.yaml (change_frequency: 5)

@@ -62,12 +62,12 @@
             "file_size": 29665,
             "imports": [
                 "json",
+                "yaml",
                 "subprocess",
                 "re",
-                "yaml",
                 "Path",
-                "Optional",
-                "App"
+                "App",
+                "Optional"
             ],
             "change_frequency": 0
         },
@@ -79,19 +79,19 @@
             "file_size": 58775,
             "imports": [
                 "os",
+                "boto3",
+                "sys",
                 "cyclopts",
                 "duckdb",
-                "sys",
-                "boto3",
                 "trino",
                 "traceback",
                 "shutil",
                 "subprocess",
                 "json",
                 "ThreadPoolExecutor",
-                "Annotated",
-                "Path",
                 "OAuth2Authentication",
+                "Path",
+                "Annotated",
                 "Lock"
             ],
             "change_frequency": 1
@@ -106,8 +106,8 @@
                 "subprocess",
                 "sys",
                 "Path",
-                "App",
-                "Annotated"
+                "Annotated",
+                "App"
             ],
             "change_frequency": 0
         },
@@ -121,8 +121,8 @@
                 "sys",
                 "typer",
                 "UTC",
-                "Annotated",
-                "client"
+                "client",
+                "Annotated"
             ],
             "change_frequency": 0
         },
@@ -134,14 +134,14 @@
             "file_size": 16751,
             "imports": [
                 "argparse",
+                "logging",
+                "re",
                 "boto3",
                 "sys",
-                "re",
-                "logging",
                 "urlparse",
                 "DagsterEventType",
-                "AssetKey",
                 "EventRecordsFilter",
+                "AssetKey",
                 "MetadataValue"
             ],
             "change_frequency": 3
@@ -199,10 +199,10 @@
             "file_size": 2064,
             "imports": [
                 "export_b2b_organization_data",
-                "DAGSTER_ENV",
-                "Definitions",
                 "b2b_organization_list_sensor",
+                "DAGSTER_ENV",
                 "S3Resource",
+                "Definitions",
                 "default_file_object_io_manager",
                 "authenticate_vault",
                 "Vault",
@@ -230,9 +230,9 @@
                 "polars",
                 "pl",
                 "UTC",
-                "Path",
-                "AssetExecutionContext",
                 "get_dbt_model_as_dataframe",
+                "AssetExecutionContext",
+                "Path",
                 "b2b_organization_list_partitions"
             ],
             "change_frequency": 0
@@ -324,8 +324,8 @@
             "imports": [
                 "Any",
                 "default_file_object_io_manager",
-                "S3Resource",
                 "DAGSTER_ENV",
+                "S3Resource",
                 "ConfigurableResource",
                 "authenticate_vault",
                 "ApiClientFactory",
@@ -353,13 +353,13 @@
             "file_size": 9734,
             "imports": [
                 "json",
-                "httpx",
                 "time",
+                "httpx",
                 "Path",
                 "upstream_or_code_changes",
                 "compute_zip_content_hash",
-                "AssetExecutionContext",
-                "EXPORT_TYPE_COMMON_CARTRIDGE"
+                "EXPORT_TYPE_COMMON_CARTRIDGE",
+                "AssetExecutionContext"
             ],
             "change_frequency": 0
         },
@@ -412,10 +412,10 @@
             "file_size": 2901,
             "imports": [
                 "Generator",
-                "ClassVar",
-                "contextmanager",
                 "BaseApiClient",
                 "ConfigurableResource",
+                "ClassVar",
+                "contextmanager",
                 "CanvasApiClient",
                 "MITLearnApiClient",
                 "Vault",
@@ -521,8 +521,8 @@
             "imports": [
                 "AssetDep",
                 "DagsterDltResource",
-                "DltResourceTranslatorData",
-                "edxorg_s3_pipeline"
+                "edxorg_s3_pipeline",
+                "DltResourceTranslatorData"
             ],
             "change_frequency": 1
         },
@@ -545,13 +545,13 @@
             "file_size": 7036,
             "imports": [
                 "logging",
-                "dlt",
                 "os",
+                "dlt",
                 "Path",
                 "EDXORG_DB_TABLES",
+                "DltResource",
                 "filesystem",
-                "incremental",
-                "DltResource"
+                "incremental"
             ],
             "change_frequency": 1
         },
@@ -590,10 +590,10 @@
             "file_size": 4723,
             "imports": [
                 "Any",
-                "make_slack_on_run_failure_sensor",
-                "DefaultSensorStatus",
                 "DAGSTER_ENV",
+                "DefaultSensorStatus",
                 "authenticate_vault",
+                "make_slack_on_run_failure_sensor",
                 "Vault",
                 "warnings"
             ],
@@ -684,28 +684,28 @@
             "imports": [
                 "os",
                 "warnings",
-                "Any",
-                "FileObjectIOManager",
-                "AssetSelection",
-                "DAGSTER_ENV",
-                "default_io_manager",
-                "gcs_multi_file_sensor",
-                "Vault",
-                "dummy_edxorg_course_structure",
-                "partial",
                 "ApiClientFactory",
                 "GCSConnection",
-                "OpenEdxApiClientFactory",
-                "edxorg_mitx_course_metadata",
+                "GCSFileIOManager",
                 "DailyResultsDir",
-                "sync_gcs_to_s3",
+                "Vault",
                 "retrieve_edx_course_exports",
-                "S3Resource",
-                "authenticate_vault",
-                "edxorg_db_table_specs",
-                "S3DownloadConfig",
+                "Any",
+                "AssetSelection",
+                "OpenEdxApiClientFactory",
                 "dummy_edxorg_course_xml",
-                "GCSFileIOManager"
+                "dummy_edxorg_course_structure",
+                "sync_gcs_to_s3",
+                "S3DownloadConfig",
+                "FileObjectIOManager",
+                "edxorg_mitx_course_metadata",
+                "edxorg_db_table_specs",
+                "partial",
+                "S3Resource",
+                "DAGSTER_ENV",
+                "default_io_manager",
+                "authenticate_vault",
+                "gcs_multi_file_sensor"
             ],
             "change_frequency": 4
         },
@@ -743,10 +743,10 @@
             "file_size": 26485,
             "imports": [
                 "hashlib",
-                "json",
-                "re",
                 "tarfile",
                 "tempfile",
+                "json",
+                "re",
                 "duckdb",
                 "jsonlines",
                 "polars",
@@ -754,18 +754,18 @@
                 "polars_hash",
                 "plh",
                 "UTC",
-                "flatten",
-                "Path",
                 "AssetExecutionContext",
                 "DATA_VERSION_TAG",
+                "flatten",
+                "Path",
                 "make_reducer",
                 "storage",
                 "sanitize_mapping_key",
                 "un_nest_course_structure",
                 "course_and_source_partitions",
+                "Field",
                 "UPath",
-                "build_mapping_key",
-                "Field"
+                "build_mapping_key"
             ],
             "change_frequency": 6
         },
@@ -777,9 +777,9 @@
             "file_size": 1483,
             "imports": [
                 "AssetKey",
+                "course_and_source_partitions",
                 "EDXORG_DB_TABLES",
-                "raw_archive_asset_key",
-                "course_and_source_partitions"
+                "raw_archive_asset_key"
             ],
             "change_frequency": 1
         },
@@ -791,14 +791,14 @@
             "file_size": 9790,
             "imports": [
                 "hashlib",
+                "json",
                 "httpx",
                 "jsonlines",
-                "json",
                 "Path",
-                "NamedTemporaryFile",
                 "MULTIPARTITION_KEY_DELIMITER",
-                "upstream_or_code_changes",
+                "NamedTemporaryFile",
                 "AssetExecutionContext",
+                "upstream_or_code_changes",
                 "process_course_xml",
                 "course_and_source_partitions",
                 "UPath"
@@ -831,9 +831,9 @@
             "file_size": 1899,
             "imports": [
                 "Path",
-                "ConfigurableIOManager",
+                "UPath",
                 "GCSConnection",
-                "UPath"
+                "ConfigurableIOManager"
             ],
             "change_frequency": 0
         },
@@ -909,8 +909,8 @@
             "imports": [
                 "os",
                 "Path",
-                "AssetMaterialization",
                 "Field",
+                "AssetMaterialization",
                 "In"
             ],
             "change_frequency": 0
@@ -923,8 +923,8 @@
             "file_size": 5150,
             "imports": [
                 "Path",
-                "Field",
-                "Config"
+                "Config",
+                "Field"
             ],
             "change_frequency": 0
         },
@@ -987,18 +987,18 @@
                 "warnings",
                 "re",
                 "Path",
-                "DAGSTER_ENV",
-                "AssetSelection",
                 "DbtCliResource",
+                "DAGSTER_ENV",
                 "AirbyteConnectionTableProps",
+                "AssetSelection",
                 "authenticate_vault",
                 "GithubApiClientFactory",
                 "Vault",
                 "generate_instructor_onboarding_user_list",
                 "DBT_REPO_DIR",
                 "create_superset_asset",
-                "SupersetApiClientFactory",
-                "AirbyteOSSWorkspace"
+                "AirbyteOSSWorkspace",
+                "SupersetApiClientFactory"
             ],
             "change_frequency": 2
         },
@@ -1019,8 +1019,8 @@
             "file_size": 7991,
             "imports": [
                 "UTC",
-                "Any",
                 "get_asset_key_for_model",
+                "Any",
                 "AssetExecutionContext",
                 "StringIO",
                 "get_dbt_model_as_dataframe",
@@ -1039,10 +1039,10 @@
             "file_size": 3164,
             "imports": [
                 "UTC",
-                "upstream_or_code_changes",
                 "full_dbt_project",
-                "get_asset_key_for_model",
                 "AssetExecutionContext",
+                "upstream_or_code_changes",
+                "get_asset_key_for_model",
                 "SupersetApiClientFactory",
                 "httpx"
             ],
@@ -1066,10 +1066,10 @@
             "imports": [
                 "os",
                 "Mapping",
-                "AssetExecutionContext",
-                "DagsterDbtTranslator",
                 "Path",
                 "Any",
+                "DagsterDbtTranslator",
+                "AssetExecutionContext",
                 "upstream_or_code_changes",
                 "DAGSTER_ENV"
             ],
@@ -1111,9 +1111,9 @@
             "imports": [
                 "Mapping",
                 "beta",
-                "AirbyteClient",
-                "Any",
                 "urlparse",
+                "Any",
+                "AirbyteClient",
                 "cached_method",
                 "Field",
                 "model_validator"
@@ -1128,10 +1128,10 @@
             "file_size": 7567,
             "imports": [
                 "Generator",
-                "Any",
-                "ConfigurableResource",
-                "UTC",
                 "contextmanager",
+                "Any",
+                "UTC",
+                "ConfigurableResource",
                 "OAuthApiClient",
                 "Vault",
                 "Field"
@@ -1175,10 +1175,10 @@
                 "os",
                 "warnings",
                 "Any",
-                "S3FileObjectIOManager",
                 "DAGSTER_ENV",
-                "AssetSelection",
+                "S3FileObjectIOManager",
                 "S3Resource",
+                "AssetSelection",
                 "default_file_object_io_manager",
                 "authenticate_vault",
                 "ApiClientFactory",
@@ -1218,12 +1218,12 @@
             "file_size": 5228,
             "imports": [
                 "hashlib",
-                "jsonlines",
                 "json",
+                "jsonlines",
                 "UTC",
+                "Path",
                 "OAuthApiClientFactory",
-                "AssetExecutionContext",
-                "Path"
+                "AssetExecutionContext"
             ],
             "change_frequency": 0
         },
@@ -1235,16 +1235,16 @@
             "file_size": 17939,
             "imports": [
                 "hashlib",
-                "json",
-                "tempfile",
                 "shutil",
+                "tempfile",
                 "os",
+                "json",
                 "httpx",
                 "Generator",
-                "Any",
-                "AssetExecutionContext",
                 "Path",
+                "AssetExecutionContext",
                 "upstream_or_code_changes",
+                "Any",
                 "ApiClientFactory",
                 "UPath",
                 "VIDEO_SHORT_THUMB_LARGE_HEIGHT",
@@ -1293,9 +1293,9 @@
                 "pygsheets",
                 "datetime",
                 "Any",
-                "unquote",
-                "parser",
                 "OpExecutionContext",
+                "parser",
+                "unquote",
                 "service_account"
             ],
             "change_frequency": 2
@@ -1382,19 +1382,19 @@
                 "warnings",
                 "Literal",
                 "DAGSTER_ENV",
-                "Definitions",
                 "S3Resource",
+                "Definitions",
                 "s3_resource",
                 "authenticate_vault",
                 "GCSConnection",
                 "OpenEdxApiClient",
                 "DailyResultsDir",
                 "Vault",
-                "sqlite_db_resource",
                 "edx_course_pipeline",
+                "HealthchecksIO",
+                "sqlite_db_resource",
                 "mitxonline_edx_daily_schedule",
-                "mysql_db_resource",
-                "HealthchecksIO"
+                "mysql_db_resource"
             ],
             "change_frequency": 0
         },
@@ -1446,24 +1446,24 @@
             "file_size": 25089,
             "imports": [
                 "hashlib",
-                "subprocess",
-                "json",
                 "time",
+                "json",
+                "subprocess",
                 "httpx",
                 "jsonlines",
                 "Generator",
+                "Config",
                 "Path",
                 "UTC",
                 "In",
-                "Config",
                 "flatten",
                 "make_reducer",
                 "write_csv",
                 "un_nest_course_structure",
                 "Field",
+                "Table",
                 "MySQLQuery",
-                "Query",
-                "Table"
+                "Query"
             ],
             "change_frequency": 1
         },
@@ -1495,8 +1495,8 @@
                 "urllib.parse",
                 "httpx",
                 "Literal",
-                "Field",
-                "ConfigurableResource"
+                "ConfigurableResource",
+                "Field"
             ],
             "change_frequency": 0
         },
@@ -1593,18 +1593,18 @@
                 "os",
                 "warnings",
                 "UTC",
-                "Any",
-                "create_repository_using_definitions_args",
-                "daily_partitioned_config",
                 "partial",
+                "Any",
+                "daily_partitioned_config",
+                "create_repository_using_definitions_args",
                 "S3Resource",
                 "DuckDBResource",
                 "DAGSTER_ENV",
                 "default_file_object_io_manager",
                 "authenticate_vault",
                 "ApiClientFactory",
-                "jsonify_tracking_logs",
                 "Vault",
+                "jsonify_tracking_logs",
                 "OpenEdxDeploymentComponent"
             ],
             "change_frequency": 1
@@ -1627,14 +1627,14 @@
             "imports": [
                 "hashlib",
                 "time",
+                "jsonlines",
                 "httpx",
                 "json",
-                "jsonlines",
                 "UTC",
                 "Path",
+                "AssetExecutionContext",
                 "urlparse",
                 "NamedTemporaryFile",
-                "AssetExecutionContext",
                 "flatten",
                 "make_reducer",
                 "upstream_or_code_changes",
@@ -1741,8 +1741,8 @@
             "file_size": 10019,
             "imports": [
                 "Generator",
-                "Config",
                 "Path",
+                "Config",
                 "In",
                 "Field"
             ],
@@ -1808,10 +1808,10 @@
                 "json",
                 "httpx",
                 "UTC",
-                "BaseModel",
                 "contains_invalid_partition_strings",
                 "AssetKey",
                 "OpenEdxApiClientFactory",
+                "BaseModel",
                 "HTTP_NOT_FOUND",
                 "OPENEDX_COURSE_RUN_PARTITIONS"
             ],
@@ -1864,9 +1864,9 @@
                 "warnings",
                 "Definitions",
                 "IcebergCatalogConfig",
-                "PolarsIcebergIOManager",
-                "S3Resource",
                 "DAGSTER_ENV",
+                "S3Resource",
+                "PolarsIcebergIOManager",
                 "default_file_object_io_manager",
                 "authenticate_vault",
                 "student_risk_probability",
@@ -1891,10 +1891,10 @@
             "file_size": 2504,
             "imports": [
                 "UTC",
+                "AssetExecutionContext",
+                "upstream_or_code_changes",
                 "risk_probability",
                 "get_dbt_model_as_dataframe",
-                "upstream_or_code_changes",
-                "AssetExecutionContext",
                 "polars",
                 "pl"
             ],
@@ -1917,10 +1917,10 @@
             "file_size": 1697,
             "imports": [
                 "json",
-                "numpy",
-                "np",
                 "polars",
                 "pl",
+                "numpy",
+                "np",
                 "Path",
                 "RobustScaler"
             ],
@@ -1970,10 +1970,10 @@
             "file_size": 5054,
             "imports": [
                 "Path",
-                "GCSFileSystem",
                 "LocalFileSystem",
-                "Any",
                 "ConfigurableIOManager",
+                "Any",
+                "GCSFileSystem",
                 "PrivateAttr",
                 "S3FileSystem",
                 "UPath",
@@ -2043,9 +2043,9 @@
                 "os",
                 "re",
                 "FilesystemIOManager",
-                "LocalFileObjectIOManager",
+                "INVALID_PARTITION_SUBSTRINGS",
                 "S3PickleIOManager",
-                "INVALID_PARTITION_SUBSTRINGS"
+                "LocalFileObjectIOManager"
             ],
             "change_frequency": 0
         },
@@ -2099,9 +2099,9 @@
                 "json",
                 "UTC",
                 "Path",
-                "ElementTree",
+                "IO",
                 "NamedTemporaryFile",
-                "IO"
+                "ElementTree"
             ],
             "change_frequency": 0
         },
@@ -2116,8 +2116,8 @@
                 "zipfile",
                 "os",
                 "Path",
-                "Vault",
-                "Any"
+                "Any",
+                "Vault"
             ],
             "change_frequency": 0
         },
@@ -2184,10 +2184,10 @@
             "file_size": 7785,
             "imports": [
                 "Any",
+                "SqlEventLogStorageMetadata",
                 "UserConfigSchema",
                 "PostgresStorageConfig",
                 "Field",
-                "SqlEventLogStorageMetadata",
                 "SqlPollingEventWatcher",
                 "create_engine",
                 "ConfigurableClassData",
@@ -2209,10 +2209,10 @@
             "file_size": 7359,
             "imports": [
                 "Any",
-                "Field",
-                "PostgresStorageConfig",
-                "InstanceInfo",
                 "UserConfigSchema",
+                "InstanceInfo",
+                "PostgresStorageConfig",
+                "Field",
                 "create_engine",
                 "ConfigurableClassData",
                 "PostgresRunStorage",
@@ -2233,9 +2233,9 @@
                 "sqlalchemy.pool",
                 "db_pool",
                 "Field",
-                "create_engine",
                 "PostgresStorageConfig",
                 "ScheduleStorageSqlMetadata",
+                "create_engine",
                 "UserConfigSchema",
                 "ConfigurableClassData",
                 "PostgresScheduleStorage",
@@ -2308,9 +2308,9 @@
             "file_size": 2903,
             "imports": [
                 "Generator",
+                "Field",
                 "contextmanager",
                 "ClassVar",
-                "Field",
                 "ConfigurableResource",
                 "BaseApiClient",
                 "CanvasApiClient",
@@ -2340,8 +2340,8 @@
             "file_size": 2813,
             "imports": [
                 "Field",
-                "bigquery",
-                "service_account"
+                "service_account",
+                "bigquery"
             ],
             "change_frequency": 0
         },
@@ -2353,9 +2353,9 @@
             "file_size": 6065,
             "imports": [
                 "Generator",
-                "BaseApiClient",
-                "Field",
                 "Path",
+                "Field",
+                "BaseApiClient",
                 "Any"
             ],
             "change_frequency": 0
@@ -2368,10 +2368,10 @@
             "file_size": 1917,
             "imports": [
                 "contextmanager",
-                "storage",
-                "Field",
+                "service_account",
                 "ConfigurableResource",
-                "service_account"
+                "Field",
+                "storage"
             ],
             "change_frequency": 0
         },
@@ -2383,9 +2383,9 @@
             "file_size": 1758,
             "imports": [
                 "ConfigurableResource",
+                "Field",
                 "Vault",
-                "Github",
-                "Field"
+                "Github"
             ],
             "change_frequency": 0
         },
@@ -2400,8 +2400,8 @@
                 "hmac",
                 "json",
                 "Any",
-                "BaseApiClient",
-                "Field"
+                "Field",
+                "BaseApiClient"
             ],
             "change_frequency": 1
         },
@@ -2415,9 +2415,9 @@
                 "time",
                 "httpx",
                 "Generator",
-                "Any",
-                "UTC",
                 "contextmanager",
+                "UTC",
+                "Any",
                 "ConfigurableResource",
                 "Field",
                 "Vault"
@@ -2432,10 +2432,10 @@
             "file_size": 7073,
             "imports": [
                 "Generator",
+                "contextmanager",
                 "ConfigurableResource",
                 "Self",
                 "parse_qs",
-                "contextmanager",
                 "HTTPStatusError",
                 "Field",
                 "OAuthApiClient",
@@ -2452,9 +2452,9 @@
             "imports": [
                 "shutil",
                 "datetime",
+                "Path",
                 "ConfigurableResource",
-                "Field",
-                "Path"
+                "Field"
             ],
             "change_frequency": 0
         },
@@ -2489,15 +2489,15 @@
             "file_size": 10201,
             "imports": [
                 "json",
-                "hvac",
-                "os",
                 "boto3",
+                "os",
+                "hvac",
                 "urllib.parse",
                 "webbrowser",
                 "Path",
-                "BaseHTTPRequestHandler",
+                "PrivateAttr",
                 "ConfigurableResource",
-                "PrivateAttr"
+                "BaseHTTPRequestHandler"
             ],
             "change_frequency": 1
         },
@@ -2528,10 +2528,10 @@
             "imports": [
                 "json",
                 "Callable",
-                "GCSConnection",
+                "Any",
                 "RunRequest",
-                "S3Resource",
-                "Any"
+                "GCSConnection",
+                "S3Resource"
             ],
             "change_frequency": 0
         },
@@ -11867,9 +11867,9 @@
                 "sys",
                 "cyclopts",
                 "apply_rls",
-                "lock_app",
                 "promote",
                 "dedupe_app",
+                "lock_app",
                 "export",
                 "refresh",
                 "sync",
@@ -11897,9 +11897,9 @@
                 "sys",
                 "Path",
                 "Table",
+                "Parameter",
                 "Console",
                 "Annotated",
-                "Parameter",
                 "apply_rls_filter",
                 "confirm_action"
             ],
@@ -11913,8 +11913,8 @@
             "file_size": 12412,
             "imports": [
                 "re",
-                "yaml",
                 "cyclopts",
+                "yaml",
                 "Path",
                 "Console",
                 "Table"
@@ -11929,9 +11929,9 @@
             "file_size": 4149,
             "imports": [
                 "Annotated",
-                "count_assets",
+                "dedupe",
                 "Parameter",
-                "dedupe"
+                "count_assets"
             ],
             "change_frequency": 2
         },
@@ -11944,10 +11944,10 @@
             "imports": [
                 "sys",
                 "Path",
-                "App",
-                "Table",
                 "Annotated",
                 "Console",
+                "App",
+                "Table",
                 "create_authenticated_session",
                 "get_assets_dir"
             ],
@@ -11961,8 +11961,8 @@
             "file_size": 9790,
             "imports": [
                 "subprocess",
-                "yaml",
                 "sys",
+                "yaml",
                 "Annotated",
                 "map_database_uuids",
                 "check_git_status",
@@ -11980,9 +11980,9 @@
                 "sys",
                 "Path",
                 "Console",
-                "Table",
                 "Parameter",
                 "Annotated",
+                "Table",
                 "create_authenticated_session",
                 "get_assets_dir"
             ],
@@ -11997,10 +11997,10 @@
             "imports": [
                 "sys",
                 "Annotated",
-                "Parameter",
                 "update_pushed_assets_external_flag",
                 "map_database_uuids",
-                "confirm_action"
+                "confirm_action",
+                "Parameter"
             ],
             "change_frequency": 2
         },
@@ -12036,8 +12036,8 @@
             "file_size": 6167,
             "imports": [
                 "json",
-                "re",
                 "sys",
+                "re",
                 "subprocess",
                 "yaml",
                 "Path"
@@ -12052,17 +12052,17 @@
             "file_size": 28695,
             "imports": [
                 "hashlib",
-                "webbrowser",
-                "sys",
                 "json",
+                "webbrowser",
                 "secrets",
+                "sys",
                 "requests",
                 "yaml",
                 "urlsafe_b64encode",
-                "Thread",
                 "BaseHTTPRequestHandler",
-                "parse_qs",
-                "Path"
+                "Thread",
+                "Path",
+                "parse_qs"
             ],
             "change_frequency": 4
         },

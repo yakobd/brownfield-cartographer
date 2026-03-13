@@ -20,6 +20,11 @@ def main() -> None:
         default=None,
         help="Optional node name for lineage blast-radius lookup.",
     )
+    parser.add_argument(
+        "--incremental",
+        action="store_true",
+        help="Run incremental analysis using changed files from the latest commit diff.",
+    )
     args = parser.parse_args()
 
     orchestrator = Orchestrator(repo_path=args.repo_path)
@@ -38,7 +43,7 @@ def main() -> None:
         else:
             orchestrator.run_lineage_phase()
     else:
-        orchestrator.run_all()
+        orchestrator.run_all(incremental=args.incremental)
 
 if __name__ == "__main__":
     main()

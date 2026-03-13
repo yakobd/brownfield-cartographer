@@ -34,7 +34,7 @@ class Orchestrator:
     def run(self) -> None:
         self.run_surveyor_phase()
 
-    def run_all(self) -> None:
+    def run_all(self, incremental: bool = False) -> None:
         """Run survey and lineage phases with failure isolation."""
         self._semantic_nodes = None
         try:
@@ -43,8 +43,13 @@ class Orchestrator:
             print(f"ERROR: Failed to prepare repository: {exc}")
             return
 
+        changed_files: list[str] | None = None
+        if incremental:
+            changed_files = self._get_changed_files_since_head()
+            print(f"--- Performing Incremental Analysis on [{len(changed_files)}] changed files ---")
+
         try:
-            self.run_surveyor_phase()
+            self.run_surveyor_phase(changed_files=changed_files)
         except Exception as exc:
             print(f"ERROR: Surveyor phase failed: {exc}")
 
@@ -86,7 +91,7 @@ class Orchestrator:
         finally:
             self._cleanup_prepared_repo()
 
-    def run_surveyor_phase(self) -> None:
+    def run_surveyor_phase(self, changed_files: list[str] | None = None) -> None:
         """Run Surveyor parsing and save Phase 1 graph artifacts."""
         active_repo_path, local_cleanup = self._enter_repo_context()
         print(f"--- Mapping Codebase: {active_repo_path} ---")
@@ -97,18 +102,28 @@ class Orchestrator:
             return
 
         knowledge_graph: list[FileNode] = []
+        removed_files: set[str] = set()
         file_count = 0
 
-        for root, dirs, files in os.walk(active_repo_path):
-            dirs[:] = [d for d in dirs if d not in self.excluded_dirs]
+        module_graph_path = ".cartography/module_graph.json"
 
-            for file_name in files:
-                if not file_name.endswith((".py", ".sql", ".yml", ".yaml")):
+        if changed_files is not None:
+            target_files: list[str] = []
+            for changed in changed_files:
+                changed_path = changed
+                if not os.path.isabs(changed_path):
+                    changed_path = os.path.join(active_repo_path, changed_path)
+                normalized = os.path.abspath(changed_path)
+                if normalized.endswith((".py", ".sql", ".yml", ".yaml")):
+                    target_files.append(normalized)
+
+            for full_path in target_files:
+                file_name = os.path.basename(full_path)
+                if not os.path.exists(full_path):
+                    removed_files.add(full_path)
                     continue
 
                 file_count += 1
-                full_path = os.path.join(root, file_name)
-
                 try:
                     if file_name.endswith(".py"):
                         file_node = self.surveyor.parse_file(full_path)
@@ -134,23 +149,91 @@ class Orchestrator:
                     )
                 except Exception as exc:
                     print(f"FAILED to process {file_name}: {exc}")
+        else:
+            for root, dirs, files in os.walk(active_repo_path):
+                dirs[:] = [d for d in dirs if d not in self.excluded_dirs]
+
+                for file_name in files:
+                    if not file_name.endswith((".py", ".sql", ".yml", ".yaml")):
+                        continue
+
+                    file_count += 1
+                    full_path = os.path.join(root, file_name)
+
+                    try:
+                        if file_name.endswith(".py"):
+                            file_node = self.surveyor.parse_file(full_path)
+                        else:
+                            with open(full_path, "r", encoding="utf-8") as file:
+                                content = file.read()
+
+                            dbt_refs = re.findall(r"ref\(['\"](\w+)['\"]\)", content)
+                            file_node = FileNode(
+                                file_path=full_path,
+                                language="sql" if file_name.endswith(".sql") else "yaml",
+                                file_size=os.path.getsize(full_path),
+                                imports=dbt_refs,
+                                entities=[],
+                            )
+
+                        file_node.change_frequency = get_git_velocity(full_path)
+                        knowledge_graph.append(file_node)
+
+                        print(
+                            f"[{file_count}] Registered: {os.path.basename(file_node.file_path)} "
+                            f"({file_node.language}) | Velocity: {file_node.change_frequency}"
+                        )
+                    except Exception as exc:
+                        print(f"FAILED to process {file_name}: {exc}")
 
         if file_count == 0:
             print("WARNING: No relevant files found. Check your repo_path!")
 
-        module_nodes = self.surveyor.to_module_nodes(knowledge_graph)
+        if changed_files is not None and os.path.exists(module_graph_path):
+            with open(module_graph_path, "r", encoding="utf-8") as existing_file:
+                existing_data = json.loads(existing_file.read())
+            existing_nodes = existing_data.get("nodes", [])
+            merged_node_map = {
+                str(node.get("id")): dict(node)
+                for node in existing_nodes
+                if isinstance(node, dict) and node.get("id")
+            }
+
+            for removed in removed_files:
+                merged_node_map.pop(removed, None)
+
+            for node in self.surveyor.to_module_nodes(knowledge_graph):
+                merged_node_map[node.id] = node.model_dump()
+
+            module_nodes = []
+            for raw_node in merged_node_map.values():
+                try:
+                    module_nodes.append(ModuleNode.model_validate(raw_node))
+                except Exception:
+                    continue
+        else:
+            module_nodes = self.surveyor.to_module_nodes(knowledge_graph)
+
         self.surveyor.build_graph(module_nodes)
         surveyor_hubs = self.surveyor.calculate_pagerank()
         dead_modules = self.surveyor.detect_dead_code()
         circular_dependencies = self.surveyor.detect_cycles()
 
-        survey_data = [node.model_dump() for node in knowledge_graph]
+        survey_data = [
+            {
+                "file_path": node.file_path,
+                "file_size": node.file_size,
+                "imports": node.imports,
+                "change_frequency": node.change_frequency,
+            }
+            for node in module_nodes
+        ]
         module_graph_service = KnowledgeGraphService()
 
-        for node in knowledge_graph:
+        for node in module_nodes:
             module_graph_service.add_typed_node(
                 ModuleNode(
-                    id=node.file_path,
+                    id=node.id,
                     file_path=node.file_path,
                     language=node.language,
                     file_size=node.file_size,
@@ -159,27 +242,26 @@ class Orchestrator:
                 )
             )
 
-        module_lookup = self._build_module_lookup(knowledge_graph)
-        for node in knowledge_graph:
+        module_lookup = self._build_module_lookup(module_nodes)
+        for node in module_nodes:
             for import_name in node.imports:
                 target_id = self._resolve_module_target(import_name, module_lookup)
                 if target_id and target_id in module_graph_service.graph:
                     module_graph_service.add_typed_edge(
-                        node.file_path,
+                        node.id,
                         target_id,
-                        Edge(source=node.file_path, target=target_id, relation="DEPENDS_ON"),
+                        Edge(source=node.id, target=target_id, relation="DEPENDS_ON"),
                     )
 
         print("\n--- Running Phase 1 Analytics (NetworkX) ---")
         os.makedirs(".cartography", exist_ok=True)
-        module_graph_path = ".cartography/module_graph.json"
 
         analysis = analyze_codebase_graph(module_graph_path, survey_data=survey_data)
 
-        sorted_nodes = sorted(knowledge_graph, key=lambda node: node.change_frequency, reverse=True)
+        sorted_nodes = sorted(module_nodes, key=lambda node: node.change_frequency, reverse=True)
         if sorted_nodes:
             top_count = max(1, math.ceil(len(sorted_nodes) * 0.2))
-            analysis["high_velocity_core"] = [node.file_path for node in sorted_nodes[:top_count]]
+            analysis["high_velocity_core"] = [node.id for node in sorted_nodes[:top_count]]
         else:
             analysis["high_velocity_core"] = []
 
@@ -204,6 +286,23 @@ class Orchestrator:
 
         if local_cleanup:
             self._cleanup_prepared_repo()
+
+    def _get_changed_files_since_head(self) -> list[str]:
+        """Return changed files from latest commit diff (HEAD~1..HEAD)."""
+        active_repo_path, _ = self._enter_repo_context()
+        result = subprocess.run(
+            ["git", "diff", "--name-only", "HEAD~1"],
+            cwd=active_repo_path,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            print(f"WARNING: Incremental diff failed; defaulting to full scan: {result.stderr.strip()}")
+            return []
+
+        changed = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        return changed
 
     def run_lineage_phase(self) -> None:
         """Run lineage analysis and save the graph under .cartography."""
