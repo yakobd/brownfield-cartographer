@@ -19,7 +19,7 @@ else:
 
     # 2. Sidebar Stats
     st.sidebar.header("Network Stats")
-    st.sidebar.metric("Total Nodes", len(data["graph_data"]["nodes"]))
+    st.sidebar.metric("Total Nodes", len(data["graph"]["nodes"]))
     st.sidebar.metric("Circular Loops", len(data["circular_dependencies"]))
     
     st.sidebar.subheader("Top Architectural Hubs")
@@ -30,7 +30,7 @@ else:
     net = Network(height="600px", width="100%", bgcolor="#222222", font_color="white", directed=True)
 
     # Add Nodes
-    for node in data["graph_data"]["nodes"]:
+    for node in data["graph"]["nodes"]:
         file_name = os.path.basename(node["id"])
         # Color nodes: High velocity = Red, Others = Blue
         is_high_velocity = node["id"] in data["high_velocity_core"]
@@ -39,7 +39,7 @@ else:
         net.add_node(node["id"], label=file_name, title=node["id"], color=color, size=20)
 
     # Add Edges
-    for edge in data["graph_data"]["edges"]:
+    for edge in data["graph"]["edges"]:
         net.add_edge(edge["source"], edge["target"])
 
     # 4. Physics & Styling

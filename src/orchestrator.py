@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import math
 import re
@@ -7,6 +8,7 @@ import shutil
 import subprocess
 
 from src.agents.surveyor import Surveyor
+from src.agents.archivist import ArchivistAgent
 from src.analyzers.git_analyzer import get_git_velocity
 from src.agents.hydrologist import HydrologistAgent
 from src.graph.knowledge_graph import KnowledgeGraphService, analyze_codebase_graph
@@ -20,6 +22,7 @@ class Orchestrator:
         self.repo_path = repo_path or os.getcwd()
         self.surveyor = Surveyor()
         self.hydrologist = HydrologistAgent()
+        self.archivist = ArchivistAgent()
         self.excluded_dirs = {".git", ".venv", "venv", "node_modules", "__pycache__", ".cartography"}
         self._prepared_repo_path: str | None = None
         self._temp_repo_path = os.path.abspath(os.path.join(".cartography", "temp_repo"))
@@ -44,6 +47,11 @@ class Orchestrator:
             self.run_lineage_phase()
         except Exception as exc:
             print(f"ERROR: Lineage phase failed: {exc}")
+
+        try:
+            self.run_archivist_phase()
+        except Exception as exc:
+            print(f"ERROR: Archivist phase failed: {exc}")
         finally:
             self._cleanup_prepared_repo()
 
@@ -215,6 +223,24 @@ class Orchestrator:
 
         if local_cleanup:
             self._cleanup_prepared_repo()
+
+    def run_archivist_phase(self) -> None:
+        """Generate human-readable summary docs from module and lineage artifacts."""
+        module_graph_path = ".cartography/module_graph.json"
+        lineage_graph_path = ".cartography/lineage_graph.json"
+
+        if not os.path.exists(module_graph_path):
+            raise FileNotFoundError(f"Missing required artifact: {module_graph_path}")
+        if not os.path.exists(lineage_graph_path):
+            raise FileNotFoundError(f"Missing required artifact: {lineage_graph_path}")
+
+        with open(module_graph_path, "r", encoding="utf-8") as file:
+            module_data = json.loads(file.read())
+        with open(lineage_graph_path, "r", encoding="utf-8") as file:
+            lineage_data = json.loads(file.read())
+
+        summary_path = self.archivist.generate_documents(module_data, lineage_data)
+        print(f"--- Archivist phase complete. Generated summary at {summary_path} ---")
 
     def _prepare_repo(self) -> str:
         """Prepare repository path, cloning remote URLs into .cartography/temp_repo."""
