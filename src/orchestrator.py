@@ -274,7 +274,9 @@ class Orchestrator:
             module_data["nodes"] = nodes
 
         summary_path = self.archivist.generate_documents(module_data, lineage_data)
+        codebase_path = self.archivist.generate_CODEBASE_md(module_graph_path, lineage_graph_path)
         print(f"--- Archivist phase complete. Generated summary at {summary_path} ---")
+        print(f"--- Archivist phase complete. Generated CODEBASE at {codebase_path} ---")
 
     def _prepare_repo(self) -> str:
         """Prepare repository path, cloning remote URLs into .cartography/temp_repo."""
