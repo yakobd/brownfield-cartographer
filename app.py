@@ -6,7 +6,7 @@ import streamlit.components.v1 as components
 
 st.set_page_config(layout="wide", page_title="Brownfield Cartographer")
 
-st.title("Codebase Map: Phase 3 Visualizer")
+st.title("Codebase Map: Visualizer")
 
 # 1. Load the data
 DATA_PATH = ".cartography/lineage_graph.json"

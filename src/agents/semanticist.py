@@ -1,6 +1,7 @@
 import os
 import time
 import json
+from pathlib import Path
 from typing import Dict, List, Optional
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
@@ -15,19 +16,28 @@ load_dotenv()
 class SemanticistAgent:
     def __init__(self):
         """Initializes OpenRouter via OpenAI client with safe fallback behavior."""
-        self.model_name = "google/gemini-2.0-flash-001" # For bulk
-        self.synthesis_model = "anthropic/claude-3-sonnet" # For the Day-One Report
+        load_dotenv()
+        self.model_name = "google/gemini-pro-1.5" # For bulk
+        self.synthesis_model = "openai/gpt-4o-mini" # For the Day-One Report
         self.budget = BudgetManager(limit_usd=2.00)
-        self.client = OpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=os.getenv("OPENROUTER_API_KEY"),
-        )
+        self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+        self.openrouter_referer = os.getenv("OPENROUTER_HTTP_REFERER", "https://brownfield-cartographer.local")
+        self.openrouter_title = os.getenv("OPENROUTER_X_TITLE", "Brownfield Cartographer")
+        self.client = None
 
-        if not os.getenv("OPENROUTER_API_KEY"):
+        if not self.openrouter_api_key:
             print("CRITICAL: OPENROUTER_API_KEY not found in .env file.")
-            self.client = None
             self.embedding_model = None
             return
+
+        self.client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=self.openrouter_api_key,
+            default_headers={
+                "HTTP-Referer": self.openrouter_referer,
+                "X-Title": self.openrouter_title,
+            },
+        )
 
         try:
             print(f"✔ Semanticist: OpenRouter client initialized with model {self.model_name}.")
@@ -36,6 +46,74 @@ class SemanticistAgent:
             self.client = None
 
         self.embedding_model = None
+
+    def _analysis_failed_payload(self) -> Dict:
+        return {
+            "purpose": "Analysis failed for this module.",
+            "drift_detected": False,
+            "drift_note": None,
+        }
+
+    def _analyze_module(self, file_path: str, code_content: str, docstring: Optional[str] = None) -> Dict:
+        """Send module code to Gemini and return semantic_analysis payload."""
+        if not self.client:
+            return self._analysis_failed_payload()
+
+        snippet = code_content[:5000]
+        prompt = f"""Return ONLY raw JSON (no markdown, no prose) analyzing this code file: {file_path}
+Existing docstring: {docstring if docstring else "None"}
+
+    Critical instruction:
+    - The provided code snippet is the ground truth.
+    - Derive the business purpose from the actual code logic.
+    - Use the docstring only as a secondary reference to assess documentation drift.
+
+Required JSON keys:
+"purpose": (A 1-sentence business purpose)
+"drift_detected": (boolean)
+"drift_note": (string or null)
+
+Important output rule:
+- Respond with JSON only. Do not include code fences or extra text.
+
+Code:
+{snippet}"""
+
+        for attempt in range(1, 4):
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": "System: You are a senior architect. Always respond in valid JSON.\n\nUser: " + prompt,
+                        }
+                    ],
+                    temperature=0.1,
+                )
+
+                raw_content = (response.choices[0].message.content or "").strip()
+                if not raw_content:
+                    raise ValueError("Empty semantic_analysis response")
+
+                self.budget.update_spend(prompt, raw_content)
+                clean_json = raw_content.replace("```json", "").replace("```", "").strip()
+                parsed = json.loads(clean_json)
+
+                return {
+                    "purpose": parsed.get("purpose", f"Logic for {os.path.basename(file_path)}"),
+                    "drift_detected": bool(parsed.get("drift_detected", False)),
+                    "drift_note": parsed.get("drift_note"),
+                }
+            except Exception as e:
+                print(
+                    f"DEBUG: Gemini semantic_analysis call failed for {file_path} "
+                    f"(attempt {attempt}/3): {e}"
+                )
+                if attempt < 3:
+                    time.sleep(2)
+
+        return self._analysis_failed_payload()
 
     def generate_purpose_statement(self, file_path: str, code_content: str, docstring: Optional[str] = None) -> Dict:
         """Determines business purpose using OpenRouter with robust parsing and cleaning."""
@@ -50,56 +128,7 @@ class SemanticistAgent:
         if not self.client:
             return {"purpose": "API not initialized", "drift_detected": False, "drift_note": None}
 
-        # Snippet to avoid context window overflow
-        snippet = code_content[:5000]
-
-        prompt = f"""Return a JSON object analyzing this code file: {file_path}
-Existing docstring: {docstring if docstring else "None"}
-
-    Critical instruction:
-    - The provided code snippet is the ground truth.
-    - Derive the business purpose from the actual code logic.
-    - Use the docstring only as a secondary reference to assess documentation drift.
-
-Required JSON keys:
-"purpose": (A 1-sentence business purpose)
-"drift_detected": (boolean)
-"drift_note": (string or null)
-
-Code:
-{snippet}"""
-
-        try:
-            response = self.client.chat.completions.create(
-                model=self.model_name,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": "System: You are a senior architect. Always respond in valid JSON.\n\nUser: " + prompt,
-                    }
-                ],
-                temperature=0.1,
-                # We REMOVE response_format={"type": "json_object"} to be safer with OpenRouter
-            )
-            
-            raw_content = response.choices[0].message.content
-            self.budget.update_spend(prompt, raw_content)
-            # This 'cleaning' logic is the secret sauce to stop the 404/Parsing errors
-            clean_json = raw_content.replace("```json", "").replace("```", "").strip()
-            parsed = json.loads(clean_json)
-            
-            return {
-                "purpose": parsed.get("purpose", f"Logic for {os.path.basename(file_path)}"),
-                "drift_detected": bool(parsed.get("drift_detected", False)),
-                "drift_note": parsed.get("drift_note"),
-            }
-        except Exception as e:
-            print(f"⚠ Warning: Failed to analyze {file_path}: {e}")
-            return {
-                "purpose": f"Functional logic within {os.path.basename(file_path)}",
-                "drift_detected": False,
-                "drift_note": None
-            }
+        return self._analyze_module(file_path, code_content, docstring)
     def run_semantic_phase(self, nodes: List[Dict]) -> List[Dict]:
         """Processes the top 10 Hubs (filtering for .py files) to add semantic meaning."""
         if not self.client:
@@ -119,7 +148,7 @@ Code:
                     print(f"--- Analyzing Hub: {path} ---")
                     result = self.generate_purpose_statement(path, content)
                     node["semantic_analysis"] = result
-                    time.sleep(1.0) 
+                    time.sleep(1)
         
         return nodes
 
@@ -213,8 +242,11 @@ Return only one word that best names the domain (e.g., Ingestion, Transformation
         except Exception:
             return f"Domain{cluster_id + 1}"
 
-    def generate_fde_report(self, nodes: List[Dict]) -> str:
+    def generate_fde_report(self, nodes: List[Dict], output_dir: str | Path = ".cartography") -> str:
         """Create a concise Day-One FDE report using evidence-grounded hub context."""
+        output_path_root = Path(output_dir).resolve()
+        output_path_root.mkdir(parents=True, exist_ok=True)
+
         code_nodes = [n for n in nodes if n.get("id", "").endswith(".py")]
         top_hubs = sorted(code_nodes, key=lambda x: x.get("pagerank", 0), reverse=True)[:10]
 
@@ -223,27 +255,9 @@ Return only one word that best names the domain (e.g., Ingestion, Transformation
             node_id = str(node.get("id", "unknown"))
             semantic = node.get("semantic_analysis") if isinstance(node, dict) else None
             purpose = semantic.get("purpose", "No purpose available") if isinstance(semantic, dict) else "No purpose available"
+            hub_summaries.append(f"- {node_id}: {purpose}")
 
-            numbered_lines = ""
-            if os.path.exists(node_id):
-                try:
-                    with open(node_id, "r", encoding="utf-8") as source_file:
-                        first_50 = source_file.readlines()[:50]
-                    numbered_lines = "\n".join(
-                        f"{line_no}: {line.rstrip()}" for line_no, line in enumerate(first_50, start=1)
-                    )
-                except OSError:
-                    numbered_lines = "Unable to read source snippet."
-            else:
-                numbered_lines = "Source file not found."
-
-            hub_summaries.append(
-                f"- {node_id}: {purpose}\n"
-                f"  First 50 lines:\n{numbered_lines}"
-            )
-
-        os.makedirs(".cartography", exist_ok=True)
-        codebase_path = os.path.join(".cartography", "CODEBASE.md")
+        codebase_path = output_path_root / "CODEBASE.md"
         with open(codebase_path, "w", encoding="utf-8") as codebase_file:
             codebase_file.write("# Codebase Hub Summaries\n\n")
             codebase_file.write("\n\n".join(hub_summaries) + "\n")
@@ -265,7 +279,7 @@ Return only one word that best names the domain (e.g., Ingestion, Transformation
 
         prompt = f"""
 You are a Senior Forward Deployed Engineer onboarding onto this codebase.
-Hub summaries with numbered code snippets (context only; do not repeat snippets verbatim in output):
+Hub summaries with semantic purpose statements:
 {chr(10).join(hub_summaries)}
 Domain Cluster Summary:
 {domain_summary}
@@ -286,67 +300,43 @@ Drift: {drift_summary}
     4. Where is the business logic concentrated vs. distributed?
     5. What has changed most frequently in the last 90 days?
 """
-        try:
-            if not self.client:
-                raise RuntimeError("OpenRouter client not initialized")
+        report_body: str | None = None
+        last_error: Exception | None = None
+        for attempt in range(1, 4):
+            try:
+                if not self.client:
+                    raise RuntimeError("OpenRouter client not initialized")
 
-            response = self.client.chat.completions.create(
-                model=self.synthesis_model,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": "System: You are a Senior Forward Deployed Engineer producing concise onboarding analysis.\n\nUser: " + prompt,
-                    },
-                ],
-            )
-            report_body = (response.choices[0].message.content or "").strip()
-        except Exception as e:
-            logging.warning("FDE synthesis failed; using static fallback report: %s", e)
-            fallback_citations = [f"- {str(node.get('id', 'unknown'))}:L1" for node in top_hubs[:5]]
-            citation_block = "\n".join(fallback_citations) if fallback_citations else "- unavailable:L1"
+                response = self.client.chat.completions.create(
+                    model=self.synthesis_model,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": "System: You are a Senior Forward Deployed Engineer producing concise onboarding analysis.\n\nUser: " + prompt,
+                        },
+                    ],
+                )
+                report_body = (response.choices[0].message.content or "").strip()
+                if not report_body:
+                    raise ValueError("Empty FDE synthesis response")
+                break
+            except Exception as e:
+                last_error = e
+                print(f"CRITICAL: FDE Synthesis failed with error: {e} (attempt {attempt}/3)")
+                if attempt < 3:
+                    time.sleep(2)
+
+        if not report_body:
             report_body = (
-                "## 1. What is the primary data ingestion path?\n\n"
-                "Static fallback inference indicates ingestion paths likely originate in the highest-ranked Python hubs and their referenced adapters. "
-                "Without live synthesis, this section prioritizes directly observed hub context and domain grouping metadata.\n\n"
-                "Domain clustering suggests ingestion responsibilities are concentrated in a subset of hubs where responsibilities are explicitly semanticized. "
-                "This should be validated against runtime entrypoints and upstream schedulers.\n\n"
-                "### Evidence\n"
-                + citation_block
-                + "\n\n"
-                "## 2. What are the 3-5 most critical output datasets/endpoints?\n\n"
-                "The strongest static signal for critical outputs is structural centrality combined with semantic purpose labels. "
-                "Top hubs provide the best proxy for files that shape output datasets and exposed endpoints.\n\n"
-                "Domain summary indicates where result-producing logic likely converges, especially in clusters tied to transformation and reporting responsibilities.\n\n"
-                "### Evidence\n"
-                + citation_block
-                + "\n\n"
-                "## 3. What is the blast radius if the most critical module fails?\n\n"
-                "Failure blast radius is expected to propagate to downstream modules in the same domain cluster and any dependent lineage edges. "
-                "Top-ranked hubs increase this risk due to higher architectural centrality.\n\n"
-                "Operationally, the largest risk is interruption of data handoff boundaries where a central module feeds multiple dependent paths.\n\n"
-                "### Evidence\n"
-                + citation_block
-                + "\n\n"
-                "## 4. Where is the business logic concentrated vs. distributed?\n\n"
-                "Business logic appears partially concentrated in top hubs and partially distributed across domain clusters inferred from purpose statements. "
-                "This mixed topology suggests both reusable cores and spread-out orchestration surfaces.\n\n"
-                "A concentrated core improves consistency, while distributed edge logic can increase maintenance cost and review complexity over time.\n\n"
-                "### Evidence\n"
-                + citation_block
-                + "\n\n"
-                "## 5. What has changed most frequently in the last 90 days?\n\n"
-                "This fallback cannot run temporal VCS synthesis, so it uses current hub ranking and semantic summaries as a proxy for likely high-change components. "
-                "Use git velocity metrics from Surveyor artifacts to confirm exact 90-day churn.\n\n"
-                "Prioritize validation of top hubs and domain-critical files first, then reconcile with commit-frequency evidence for release planning.\n\n"
-                "### Evidence\n"
-                + citation_block
-                + "\n"
+                "FDE synthesis failed after 3 attempts. "
+                "Please check OpenRouter availability and API configuration."
             )
+            if last_error is not None:
+                report_body += f"\n\nLast error: {last_error}"
 
-        report_path = os.path.join(".cartography", "FDE_ONBOARDING_REPORT.md")
-        os.makedirs(os.path.dirname(report_path), exist_ok=True)
+        report_path = output_path_root / "ONBOARDING_REPORT.md"
         with open(report_path, "w", encoding="utf-8") as f:
             f.write("# FDE Onboarding Report\n\n")
             f.write(report_body + "\n")
 
-        return report_path
+        return str(report_path)

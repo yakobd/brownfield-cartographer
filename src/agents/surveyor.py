@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 from typing import Any, List, Tuple
 
+from dotenv import load_dotenv
 import networkx as nx
 from tree_sitter import Language, Parser, Query
 import tree_sitter_sql
@@ -19,6 +20,9 @@ class Surveyor:
     """Multi-lingual parser for Python, SQL, and YAML source mapping."""
 
     def __init__(self) -> None:
+        load_dotenv()
+        self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY", "")
+        self.supported_extensions = (".py", ".sql", ".yml", ".yaml")
         # Initialize grammar objects per file extension.
         self.langs = {
             ".py": Language(tspython.language()),
@@ -38,7 +42,8 @@ class Surveyor:
         for root, dirs, files in os.walk(repo_path):
             dirs[:] = [d for d in dirs if d not in self.excluded_dirs]
             for file_name in files:
-                if not file_name.endswith((".py", ".sql", ".yml", ".yaml")):
+                ext = Path(file_name).suffix.lower()
+                if ext not in self.supported_extensions:
                     continue
 
                 full_path = os.path.join(root, file_name)
@@ -54,7 +59,7 @@ class Surveyor:
 
     def parse_file(self, file_path: str) -> FileNode:
         path = Path(file_path)
-        ext = path.suffix
+        ext = path.suffix.lower()
         source_bytes = path.read_bytes()
         
         lang = self.langs.get(ext)

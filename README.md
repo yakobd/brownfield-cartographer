@@ -1,27 +1,10 @@
-# Brownfield Cartographer
+# The Brownfield Cartographer
 
-Brownfield Cartographer is an AI-powered code reconnaissance tool designed to map legacy or unfamiliar repositories into actionable engineering insights. It combines static parsing, dependency extraction, and graph analytics to help teams quickly understand architecture, hotspots, and data flow impact before making changes.
-
-## Project Overview
-
-This project analyzes a target repository and produces machine-readable graph artifacts for two core perspectives:
-
-- Module survey (code structure, imports, and velocity signals)
-- Data lineage (SQL/Python/YAML-driven sources, sinks, and downstream blast radius)
-
-The goal is to reduce onboarding and refactoring risk by making hidden codebase relationships explicit.
+The Brownfield Cartographer is a production-grade codebase intelligence system for rapid FDE onboarding. It transforms unfamiliar repositories into architecture-aware, queryable deliverables so engineering teams can reduce discovery time, surface risk early, and execute changes with confidence.
 
 ## Installation
 
-This project uses `uv` for dependency management.
-
-1. Install `uv`:
-
-```bash
-pip install uv
-```
-
-2. Sync dependencies from `pyproject.toml`/lock state:
+Install dependencies with `uv`:
 
 ```bash
 uv sync
@@ -29,46 +12,57 @@ uv sync
 
 ## Usage
 
-All commands are run via the CLI entrypoint in `src/cli.py`.
+### Analyze Mode
 
-### Survey
+Run the full analysis pipeline against either a local repository path or a remote GitHub URL.
 
-Generate the module graph and Phase 1 architecture metrics:
-
-```bash
-uv run python -m src.cli survey --repo-path <path>
-```
-
-Example:
+Local path:
 
 ```bash
-uv run python -m src.cli survey --repo-path "C:/path/to/target-repo"
+uv run python -m src.cli analyze --repo-path "C:/path/to/target-repo"
 ```
 
-### Lineage
-
-Generate the data flow lineage graph:
+Remote GitHub URL:
 
 ```bash
-uv run python -m src.cli lineage --repo-path <path>
+uv run python -m src.cli analyze --repo-path "https://github.com/org/repo.git"
 ```
 
-Example:
+Incremental re-analysis (changed files only):
 
 ```bash
-uv run python -m src.cli lineage --repo-path "C:/path/to/target-repo"
+uv run python -m src.cli analyze --repo-path "C:/path/to/target-repo" --incremental
 ```
 
-## Output Artifacts
+### Query Mode
 
-Generated artifacts are saved under `.cartography/`:
+Launch interactive Navigator mode to ask technical questions about the analyzed codebase:
+
+```bash
+uv run python -m src.cli query
+```
+
+Use Query Mode to investigate architecture hotspots, data lineage implications, and likely blast radius before implementation work.
+
+## Architecture
+
+The Brownfield Cartographer executes a four-stage pipeline:
+
+1. Surveyor (AST): parses repository source files to map modules, imports, and structural signals.
+2. Hydrologist (Lineage): extracts data flow relationships across SQL, Python, and YAML assets.
+3. Semanticist (LLM): generates semantic purpose statements and high-level engineering context.
+4. Archivist (Docs): compiles engagement-ready technical documentation and traceable summaries.
+
+## Artifacts
+
+Generated artifacts are written under `.cartography/`:
 
 - `.cartography/module_graph.json`
 - `.cartography/lineage_graph.json`
+- `.cartography/CODEBASE.md`
+- `.cartography/onboarding_brief.md`
+- `.cartography/cartography_trace.jsonl`
 
-## Technical Stack
+## Engagement Value
 
-- Python
-- Tree-sitter
-- SQLGlot
-- NetworkX
+This system is designed for professional client delivery where teams need fast onboarding, credible technical diagnostics, and decision-ready architecture artifacts without prolonged manual reconnaissance.

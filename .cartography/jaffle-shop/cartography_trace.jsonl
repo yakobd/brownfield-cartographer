@@ -1,0 +1,5 @@
+{"timestamp": "2026-03-14T21:25:55.249697+00:00", "agent_name": "ArchivistAgent", "action": "Write Architecture Overview", "evidence_source": ".cartography\\jaffle-shop\\module_graph.json, .cartography\\jaffle-shop\\lineage_graph.json", "confidence_score": 0.82}
+{"timestamp": "2026-03-14T21:25:55.257691+00:00", "agent_name": "ArchivistAgent", "action": "Write Critical Path", "evidence_source": ".cartography\\jaffle-shop\\module_graph.json", "confidence_score": 0.9}
+{"timestamp": "2026-03-14T21:25:55.257691+00:00", "agent_name": "ArchivistAgent", "action": "Write Data Sources & Sinks", "evidence_source": ".cartography\\jaffle-shop\\lineage_graph.json", "confidence_score": 0.9}
+{"timestamp": "2026-03-14T21:25:55.257691+00:00", "agent_name": "ArchivistAgent", "action": "Write Technical Debt", "evidence_source": ".cartography\\jaffle-shop\\module_graph.json", "confidence_score": 0.86}
+{"timestamp": "2026-03-14T21:25:55.257691+00:00", "agent_name": "ArchivistAgent", "action": "Write High-Velocity Core", "evidence_source": ".cartography\\jaffle-shop\\module_graph.json", "confidence_score": 0.9}

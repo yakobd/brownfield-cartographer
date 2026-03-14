@@ -2,11 +2,11 @@
 Architecture Overview:
 This CODEBASE summary combines module structure and lineage metadata to highlight where the system's architecture is concentrated, how data flows from ingestion to sink points, and where operational risk is likely to accumulate due to dependency complexity, documentation drift, or high change velocity.
 - Critical Path:
-- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\.pre-commit-config.yaml (PageRank: 0.000000)
-- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\build.yaml (PageRank: 0.000000)
-- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\docker-compose.yaml (PageRank: 0.000000)
-- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\.gemini\config.yaml (PageRank: 0.000000)
-- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\.github\workflows\project_automation.yaml (PageRank: 0.000000)
+- C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\.pre-commit-config.yaml (PageRank: 0.000000)
+- C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\build.yaml (PageRank: 0.000000)
+- C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\docker-compose.yaml (PageRank: 0.000000)
+- C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\.gemini\config.yaml (PageRank: 0.000000)
+- C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\.github\workflows\project_automation.yaml (PageRank: 0.000000)
 - Data Sources & Sinks:
 Ingestion points:
 - source:ol_warehouse_production_dimensional.afact_course_page_engagement
@@ -2262,13 +2262,13 @@ Circular dependencies:
 Documentation Drift flags:
 - None detected
 - High-Velocity Core:
-- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\src\ol_dbt\models\reporting\_reporting__models.yml (change_frequency: 21)
-- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\.pre-commit-config.yaml (change_frequency: 10)
-- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\src\ol_dbt\models\migration\edxorg_to_mitxonline_enrollments.sql (change_frequency: 9)
-- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\docker-compose.yaml (change_frequency: 6)
+- C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\src\ol_dbt\models\reporting\_reporting__models.yml (change_frequency: 21)
+- C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\.pre-commit-config.yaml (change_frequency: 10)
+- C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\src\ol_dbt\models\migration\edxorg_to_mitxonline_enrollments.sql (change_frequency: 9)
+- C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\docker-compose.yaml (change_frequency: 6)
 - C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\dg_projects\edxorg\edxorg\assets\edxorg_archive.py (change_frequency: 6)
-- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\src\ol_superset\assets\metadata.yaml (change_frequency: 6)
-- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\src\ol_superset\assets\databases\Trino.yaml (change_frequency: 6)
+- C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\src\ol_superset\assets\metadata.yaml (change_frequency: 6)
+- C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\src\ol_superset\assets\databases\Trino.yaml (change_frequency: 6)
 - C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\dg_projects\edxorg\edxorg\assets\openedx_course_archives.py (change_frequency: 5)
-- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\src\ol_superset\.sup\state.yml (change_frequency: 5)
-- C:/Users/Yakob/Desktop/10 Academy/Week-4/cloned_repo_3/ol-data-platform\src\ol_superset\assets\charts\Content_Engagement_-_Weekly_fb5f7dd7-f56e-44f4-97f6-ed0c3804382f.yaml (change_frequency: 5)
+- C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\src\ol_superset\.sup\state.yml (change_frequency: 5)
+- C:\Users\Yakob\Desktop\10 Academy\Week-4\cloned_repo_3\ol-data-platform\src\ol_superset\assets\charts\Content_Engagement_-_Weekly_fb5f7dd7-f56e-44f4-97f6-ed0c3804382f.yaml (change_frequency: 5)

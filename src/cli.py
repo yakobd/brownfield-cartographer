@@ -1,6 +1,7 @@
 import argparse
 
 from src.orchestrator import Orchestrator
+from src.utils.repo_manager import RepositoryManager
 
 
 def main() -> None:
@@ -27,23 +28,30 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    orchestrator = Orchestrator(repo_path=args.repo_path)
-    if args.command == "survey":
-        orchestrator.run_surveyor_phase()
-    elif args.command == "lineage":
-        if args.node:
-            orchestrator.hydrologist.analyze_repo(orchestrator.repo_path)
-            blast_radius = orchestrator.hydrologist.get_blast_radius(args.node)
-            if blast_radius:
-                print(f"Blast radius for '{args.node}':")
-                for affected_node in blast_radius:
-                    print(f"- {affected_node}")
+    analysis_path = RepositoryManager.prepare_repo(args.repo_path)
+    cloned_from_github = RepositoryManager.is_github_url(args.repo_path)
+
+    try:
+        orchestrator = Orchestrator(repo_path=analysis_path)
+        if args.command == "survey":
+            orchestrator.run_surveyor_phase()
+        elif args.command == "lineage":
+            if args.node:
+                orchestrator.hydrologist.analyze_repo(orchestrator.repo_path)
+                blast_radius = orchestrator.hydrologist.get_blast_radius(args.node)
+                if blast_radius:
+                    print(f"Blast radius for '{args.node}':")
+                    for affected_node in blast_radius:
+                        print(f"- {affected_node}")
+                else:
+                    print(f"No downstream impact found for '{args.node}'.")
             else:
-                print(f"No downstream impact found for '{args.node}'.")
+                orchestrator.run_lineage_phase()
         else:
-            orchestrator.run_lineage_phase()
-    else:
-        orchestrator.run_all(incremental=args.incremental)
+            orchestrator.run_all(incremental=args.incremental)
+    finally:
+        if cloned_from_github:
+            RepositoryManager.cleanup(analysis_path)
 
 if __name__ == "__main__":
     main()

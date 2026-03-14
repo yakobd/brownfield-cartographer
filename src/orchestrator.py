@@ -6,6 +6,8 @@ import math
 import re
 import shutil
 import subprocess
+from pathlib import Path
+from urllib.parse import urlparse
 
 
 from src.agents.surveyor import Surveyor
@@ -22,14 +24,35 @@ class Orchestrator:
 
     def __init__(self, repo_path: str | None = None) -> None:
         self.repo_path = repo_path or os.getcwd()
+        self.project_name = self._extract_project_name(self.repo_path)
+        self.output_dir = Path(".cartography") / self.project_name
+        self.output_dir.mkdir(parents=True, exist_ok=True)
         self.surveyor = Surveyor()
         self.hydrologist = HydrologistAgent()
-        self.archivist = ArchivistAgent()
+        self.archivist = ArchivistAgent(output_dir=self.output_dir)
         self.semanticist = SemanticistAgent()
         self.excluded_dirs = {".git", ".venv", "venv", "node_modules", "__pycache__", ".cartography"}
         self._prepared_repo_path: str | None = None
-        self._temp_repo_path = os.path.abspath(os.path.join(".cartography", "temp_repo"))
+        self._temp_repo_path = str((self.output_dir / "temp_repo").resolve())
         self._semantic_nodes: list[dict] | None = None
+
+    def _extract_project_name(self, repo_path: str) -> str:
+        """Derive a stable project name from a URL or local path."""
+        target = (repo_path or "").strip()
+        if not target:
+            return "workspace"
+
+        project_name = ""
+        if "://" in target:
+            parsed = urlparse(target)
+            project_name = Path(parsed.path).name
+        elif target.startswith("git@") and ":" in target:
+            project_name = Path(target.split(":", 1)[1]).name
+        else:
+            project_name = Path(target).expanduser().resolve().name
+
+        project_name = re.sub(r"\.git$", "", project_name, flags=re.IGNORECASE)
+        return project_name or "workspace"
 
     def run(self) -> None:
         self.run_surveyor_phase()
@@ -59,7 +82,7 @@ class Orchestrator:
             print(f"ERROR: Lineage phase failed: {exc}")
 
         try:
-            module_graph_path = ".cartography/module_graph.json"
+            module_graph_path = str(self.output_dir / "module_graph.json")
             if os.path.exists(module_graph_path):
                 with open(module_graph_path, "r", encoding="utf-8") as file:
                     module_data = json.loads(file.read())
@@ -67,9 +90,12 @@ class Orchestrator:
                 self._semantic_nodes = self.semanticist.run_semantic_phase(nodes)
                 print("--- Clustering semantic hubs into domains ---")
                 self._semantic_nodes = self.semanticist.cluster_into_domains(self._semantic_nodes)
-                print("--- Generating semantic artifacts in .cartography ---")
-                report_path = self.semanticist.generate_fde_report(self._semantic_nodes)
-                codebase_path = os.path.join(".cartography", "CODEBASE.md")
+                print(f"--- Generating semantic artifacts in {self.output_dir.resolve()} ---")
+                report_path = self.semanticist.generate_fde_report(
+                    self._semantic_nodes,
+                    output_dir=self.output_dir,
+                )
+                codebase_path = str((self.output_dir / "CODEBASE.md").resolve())
                 if os.path.exists(codebase_path):
                     print(f"--- Codebase summary saved to {codebase_path} ---")
                 else:
@@ -105,7 +131,7 @@ class Orchestrator:
         removed_files: set[str] = set()
         file_count = 0
 
-        module_graph_path = ".cartography/module_graph.json"
+        module_graph_path = str(self.output_dir / "module_graph.json")
 
         if changed_files is not None:
             target_files: list[str] = []
@@ -254,7 +280,7 @@ class Orchestrator:
                     )
 
         print("\n--- Running Phase 1 Analytics (NetworkX) ---")
-        os.makedirs(".cartography", exist_ok=True)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
 
         analysis = analyze_codebase_graph(module_graph_path, survey_data=survey_data)
 
@@ -268,7 +294,7 @@ class Orchestrator:
         with open(module_graph_path, "w", encoding="utf-8") as file:
             file.write(module_graph_service.to_json())
 
-        print(f"--- Done! Saved typed module graph to {module_graph_path} ---")
+        print(f"--- Done! Saved typed module graph to {Path(module_graph_path).resolve()} ---")
         print(f"--- Analytics computed for {len(analysis.get('hubs', []))} hubs ---")
         print(f"Top Architectural Hub: {analysis['hubs'][0] if analysis['hubs'] else 'N/A'}")
         print(f"Circular Loops Found: {len(analysis['circular_dependencies'])}")
@@ -305,7 +331,7 @@ class Orchestrator:
         return changed
 
     def run_lineage_phase(self) -> None:
-        """Run lineage analysis and save the graph under .cartography."""
+        """Run lineage analysis and save the graph under the namespaced output directory."""
         active_repo_path, local_cleanup = self._enter_repo_context()
         graph = self.hydrologist.analyze_repo(active_repo_path)
         svc = KnowledgeGraphService()
@@ -339,8 +365,8 @@ class Orchestrator:
                     Edge(source=str(source), target=str(target), relation=relation),
                 )
 
-        os.makedirs(".cartography", exist_ok=True)
-        output_path = ".cartography/lineage_graph.json"
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = str(self.output_dir / "lineage_graph.json")
         with open(output_path, "w", encoding="utf-8") as file:
             file.write(svc.to_json())
 
@@ -348,7 +374,7 @@ class Orchestrator:
         source_count = len(impact.get("sources", []))
         sink_count = len(impact.get("sinks", []))
 
-        print(f"--- Lineage phase complete. Saved graph to {output_path} ---")
+        print(f"--- Lineage phase complete. Saved graph to {Path(output_path).resolve()} ---")
         print(f"Sources detected: {source_count} | Sinks detected: {sink_count}")
 
         if local_cleanup:
@@ -356,8 +382,8 @@ class Orchestrator:
 
     def run_archivist_phase(self, nodes: list[dict] | None = None) -> None:
         """Generate human-readable summary docs from module and lineage artifacts."""
-        module_graph_path = ".cartography/module_graph.json"
-        lineage_graph_path = ".cartography/lineage_graph.json"
+        module_graph_path = str(self.output_dir / "module_graph.json")
+        lineage_graph_path = str(self.output_dir / "lineage_graph.json")
 
         if not os.path.exists(module_graph_path):
             raise FileNotFoundError(f"Missing required artifact: {module_graph_path}")
@@ -374,8 +400,8 @@ class Orchestrator:
 
         summary_path = self.archivist.generate_documents(module_data, lineage_data)
         codebase_path = self.archivist.generate_CODEBASE_md(module_graph_path, lineage_graph_path)
-        print(f"--- Archivist phase complete. Generated summary at {summary_path} ---")
-        print(f"--- Archivist phase complete. Generated CODEBASE at {codebase_path} ---")
+        print(f"--- Archivist phase complete. Generated summary at {Path(summary_path).resolve()} ---")
+        print(f"--- Archivist phase complete. Generated CODEBASE at {Path(codebase_path).resolve()} ---")
 
     def _prepare_repo(self) -> str:
         """Prepare repository path, cloning remote URLs into .cartography/temp_repo."""
@@ -388,7 +414,7 @@ class Orchestrator:
                     "Git executable not found. Please install Git to analyze remote repositories."
                 )
 
-            os.makedirs(".cartography", exist_ok=True)
+            self.output_dir.mkdir(parents=True, exist_ok=True)
             if os.path.exists(self._temp_repo_path):
                 shutil.rmtree(self._temp_repo_path)
 
